@@ -21,19 +21,25 @@ G_DEFINE_TYPE(ReportTask, report_task, G_TYPE_DBUS_OBJECT_SKELETON);
 struct _ReportTaskPrivate
 {
     ReportDbusTask *task_iface;
+    gchar          *problem_path;
+    gchar          *workflow_id;
 };
 
 static gboolean
 report_task_handle_start(ReportDbusTask * /*object*/,
-                         GDBusMethodInvocation * /*invocation*/)
+                         GDBusMethodInvocation *invocation)
 {
+    g_message("Started task!");
+    g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
     return TRUE;
 }
 
 static gboolean
 report_task_handle_cancel(ReportDbusTask * /*object*/,
-                          GDBusMethodInvocation * /*invocation*/)
+                          GDBusMethodInvocation *invocation)
 {
+    g_message("Canceled task!");
+    g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
     return TRUE;
 }
 
@@ -66,20 +72,38 @@ report_task_constructed(GObject *obj)
 }
 
 static void
+report_task_dispose(GObject *obj)
+{
+    ReportTask *self = REPORT_TASK(obj);
+
+    g_free(self->pv->problem_path);
+    g_free(self->pv->workflow_id);
+
+    G_OBJECT_CLASS(report_task_parent_class)->finalize(obj);
+}
+
+static void
 report_task_class_init(ReportTaskClass *klass)
 {
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
     object_class->constructed = report_task_constructed;
+    object_class->dispose     = report_task_dispose;
 
     g_type_class_add_private (klass, sizeof (ReportTaskPrivate));
 }
 
-ReportTask *report_task_new(const gchar *object_path)
+ReportTask *report_task_new(const gchar *object_path,
+                            const gchar *problem_path,
+                            const gchar *workflow_id)
 {
     gpointer object = g_object_new(REPORT_TYPE_TASK,
                                    "g-object-path", object_path,
                                    NULL);
 
-    return static_cast<ReportTask *>(object);
+    ReportTask *task = static_cast<ReportTask *>(object);
+    task->pv->problem_path = g_strdup(problem_path);
+    task->pv->workflow_id  = g_strdup(workflow_id);
+
+    return task;
 }

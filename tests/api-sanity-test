@@ -1,0 +1,132 @@
+#!/usr/bin/python3
+
+import dbus
+
+
+class DBusObject(object):
+
+    def __init__(self, bus, address, obj_path, interface):
+        obj_proxy = bus.get_object(address, obj_path)
+
+        self._properties = dbus.Interface(
+                            obj_proxy,
+                            dbus_interface="org.freedesktop.DBus.Properties")
+
+        self._interface = interface
+        self._obj = dbus.Interface(obj_proxy, dbus_interface=interface)
+
+    def __getattribute__(self, name):
+        try:
+            return object.__getattribute__(self, name)
+        except AttributeError:
+            obj = object.__getattribute__(self, "_obj")
+            return obj.get_dbus_method(name)
+
+    def getobject(self):
+        return object.__getattribute__(self, "_obj")
+
+    def getobjectproperties(self):
+        return object.__getattribute__(self, "_properties")
+
+    def getproperty(self, name):
+        properties = object.__getattribute__(self, "_properties")
+        interface = object.__getattribute__(self, "_interface")
+        return properties.Get(interface, name)
+
+
+class Problems2Object(DBusObject):
+
+    def __init__(self, bus, path, iface):
+        super(Problems2Object, self).__init__(
+                                        bus,
+                                        "org.freedesktop.problems",
+                                        path,
+                                        iface)
+
+
+class Problems2Service(Problems2Object):
+
+    def __init__(self, bus, path):
+        super(Problems2Service, self).__init__(
+                                        bus,
+                                        path,
+                                        "org.freedesktop.Problems2")
+
+
+class Problems2Entry(Problems2Object):
+
+    def __init__(self, bus, path):
+        super(Problems2Entry, self).__init__(
+                                        bus,
+                                        path,
+                                        "org.freedesktop.Problems2.Entry")
+
+
+class Problems2Session(Problems2Object):
+
+    def __init__(self, bus, path):
+        super(Problems2Session, self).__init__(
+                                        bus,
+                                        path,
+                                        "org.freedesktop.Problems2.Session")
+
+
+class Problems2Task(Problems2Object):
+
+    def __init__(self, bus, path):
+        super(Problems2Task, self).__init__(
+                                        bus,
+                                        path,
+                                        "org.freedesktop.Problems2.Task")
+
+
+class ReportdObject(DBusObject):
+
+    def __init__(self, bus, path, iface):
+        super(ReportdObject, self).__init__(
+                                        bus,
+                                        "org.freedesktop.reportd",
+                                        path,
+                                        iface)
+
+
+class ReportdService(ReportdObject):
+
+    def __init__(self, bus):
+        super(ReportdService, self).__init__(
+                                        bus,
+                                        "/org/freedesktop/reportd/Service",
+                                        "org.freedesktop.reportd.Service")
+
+
+class ReportdTask(ReportdObject):
+
+    def __init__(self, bus, path):
+        super(ReportdTask, self).__init__(
+                                        bus,
+                                        path,
+                                        "org.freedesktop.reportd.Task")
+
+
+system_bus = dbus.SystemBus()
+session_bus = dbus.SessionBus()
+
+p2 = Problems2Service(system_bus, '/org/freedesktop/Problems2')
+rd = ReportdService(session_bus)
+
+cnt = 1
+for pobj in p2.GetProblems(0, {}):
+    entry = Problems2Entry(system_bus, pobj)
+    print("{0} : {1}".format(cnt, entry.getproperty("Executable")))
+
+    wfs = rd.GetWorkflows(pobj)
+    cnt += 1
+    for wf_id, wf_name, wf_description in wfs:
+        print("\t{1} - ({0}) - {2}".format(wf_id, wf_name, wf_description))
+
+    tobj = rd.CreateTask(wfs[0][0], pobj)
+    print("Task - {0}".format(tobj))
+
+    task = ReportdTask(session_bus, tobj)
+    task.Start()
+    task.Cancel()

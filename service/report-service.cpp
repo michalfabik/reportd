@@ -14,6 +14,9 @@
 #include "config.h"
 
 #include "report-service.h"
+#include "report-task.h"
+#include "report-daemon.h"
+#include "report-dbus-constants.h"
 
 #include <iostream>
 #include <cstring>
@@ -26,94 +29,32 @@ G_DEFINE_TYPE(ReportService, report_service, G_TYPE_DBUS_OBJECT_SKELETON);
 
 struct _ReportServicePrivate {
     ReportDbusService *service_iface;
+    unsigned long task_cnt;
 };
 
 static gboolean
-report_service_handle_create_task(ReportDbusService * /*object*/,
-                                  GDBusMethodInvocation * /*invocation*/,
-                                  const gchar * /*arg_workflow*/,
-                                  const gchar * /*arg_problem*/)
+report_service_handle_create_task(ReportDbusService     * /*object*/,
+                                  GDBusMethodInvocation *invocation,
+                                  const gchar           *arg_workflow,
+                                  const gchar           *arg_problem,
+                                  ReportService         *self)
 {
+    if (self->pv->task_cnt == ULONG_MAX) {
+        g_dbus_method_invocation_return_error(invocation,
+                G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+                "Reportd Service cannot create a new task");
+        return TRUE;
+    }
+
+    unsigned long task_id = self->pv->task_cnt++;
+    std::string task_path(std::string(REPORTD_DBUS_TASK_BASE_PATH) + std::to_string(task_id));
+    ReportTask *t = report_task_new(task_path.c_str(), arg_workflow, arg_problem);
+    ReportDaemon::inst().register_object(G_DBUS_OBJECT_SKELETON(t));
+
+    GVariant *retval = g_variant_new("(o)", task_path.c_str());
+    g_dbus_method_invocation_return_value(invocation, retval);
+
     return TRUE;
-}
-
-static std::string
-get_problem_directory(const std::string &problem_entry)
-{
-    std::string problem_dir("/var/tmp");
-    problem_dir.append(problem_entry.begin() + problem_entry.find_last_of('/'), problem_entry.end());
-
-    if (!access(problem_dir.c_str(), R_OK))
-        return problem_dir;
-
-    auto cancellable = Gio::Cancellable::create();
-    auto connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::BUS_TYPE_SYSTEM,
-                                                      cancellable);
-    if (!connection) {
-        throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
-                               "Cannot get system bus");
-    }
-
-    auto info = Glib::RefPtr<Gio::DBus::InterfaceInfo>();
-    auto entry = Gio::DBus::Proxy::create_sync(connection,
-                                               "org.freedesktop.problems",
-                                               problem_entry,
-                                               "org.freedesktop.Problems2.Entry",
-                                               cancellable,
-                                               info,
-                                               Gio::DBus::PROXY_FLAGS_NONE);
-
-    if (!entry) {
-        throw Gio::DBus::Error(Gio::DBus::Error::INVALID_ARGS,
-                               "Problems2 Entry is not accessible");
-    }
-
-
-    Glib::Variant<std::vector<Glib::ustring> > elements;
-    entry->get_cached_property(elements, "Elements");
-
-    if (!elements) {
-        throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
-                               "Problems2 Entry does not have property Elements");
-    }
-
-    auto elem_vector = elements.get();
-    const size_t elems(elem_vector.size());
-    const size_t dbus_fd_limit(16);
-
-    struct dump_dir *dd = dd_create_skeleton(problem_dir.c_str(), -1, 0600, 0);
-
-    for (size_t batch = 0; batch < elems; batch += dbus_fd_limit) {
-        const size_t range(batch + dbus_fd_limit);
-        auto end(range > elems ? elem_vector.end() : elem_vector.begin() + range);
-        std::vector<Glib::ustring> b(elem_vector.begin() + batch, end);
-
-        auto parameters = Glib::VariantContainerBase::create_tuple({Glib::Variant<std::vector<Glib::ustring> >::create(b),
-                                                                    Glib::Variant<int>::create(1)});
-
-        auto in_fds = Gio::UnixFDList::create();
-        auto out_fds = Gio::UnixFDList::create();
-        auto reply = entry->call_sync("ReadElements",
-                                      parameters,
-                                      cancellable,
-                                      in_fds,
-                                      out_fds,
-                                      -1);
-
-        batch = range;
-
-        Glib::Variant<std::map<std::string, Glib::VariantBase> > data;
-        reply.get_child(data);
-        for (auto kv : data.get()) {
-            Glib::Variant<gint32> fd_pos = Glib::VariantBase::cast_dynamic< Glib::Variant<gint32> >(kv.second);
-
-            int fd = out_fds->get(fd_pos.get());
-            dd_copy_fd(dd, kv.first.c_str(), fd, 0, 0);
-            close(fd);
-        }
-    }
-    dd_close(dd);
-    return problem_dir;
 }
 
 static gboolean
@@ -124,7 +65,7 @@ report_service_handle_get_workflows(ReportDbusService * /*object*/,
     std::string problem_dir;
 
     try {
-        problem_dir = get_problem_directory(arg_problem);
+        problem_dir = ReportDaemon::inst().get_problem_directory(arg_problem);
     }
     catch (const Glib::Error &err) {
         g_dbus_method_invocation_return_error(invocation,
@@ -173,6 +114,7 @@ report_service_init(ReportService *self)
     self->pv = G_TYPE_INSTANCE_GET_PRIVATE(self, REPORT_TYPE_SERVICE, ReportServicePrivate);
 
     self->pv->service_iface = report_dbus_service_skeleton_new();
+    self->pv->task_cnt = 1;
 
     g_signal_connect(self->pv->service_iface,
                      "handle-create-task",

@@ -19,8 +19,30 @@
 
 #include <giomm.h>
 
-G_BEGIN_DECLS
+class ReportDaemon {
+    public:
+        std::string get_problem_directory (const std::string   &);
 
-G_END_DECLS
+        void        register_object       (GDBusObjectSkeleton *);
+
+
+        static ReportDaemon& inst();
+
+        static void on_name_acquired      (GDBusConnection *,
+                                           const gchar *,
+                                           gpointer);
+
+    private:
+        void settle_connection(GDBusConnection *);
+
+        ReportDaemon();
+        ReportDaemon(const ReportDaemon &) = delete;
+        ReportDaemon& operator=(const ReportDaemon &) = delete;
+
+        class ReportDaemonPrivate *d;
+
+        ~ReportDaemon();
+};
+
 
 #endif /*__REPORT_DAEMON_H__*/
