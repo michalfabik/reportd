@@ -54,9 +54,22 @@ report_service_handle_create_task(ReportDbusService     * /*object*/,
         return TRUE;
     }
 
+    workflow_t *wf = report_service_find_workflow_by_name(self, arg_workflow);
+    if (wf == NULL) {
+        g_dbus_method_invocation_return_error(invocation,
+                G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+                "Cannot create a new task from unknown workflow: '%s'",
+                arg_workflow);
+        return TRUE;
+    }
+
     unsigned long task_id = self->pv->task_cnt++;
     std::string task_path(std::string(REPORTD_DBUS_TASK_BASE_PATH) + std::to_string(task_id));
-    ReportTask *t = report_task_new(task_path.c_str(), arg_workflow, arg_problem);
+
+    ReportTask *t = report_task_new(task_path.c_str(),
+                                    arg_problem,
+                                    wf);
+
     ReportDaemon::inst().register_object(G_DBUS_OBJECT_SKELETON(t));
 
     GVariant *retval = g_variant_new("(o)", task_path.c_str());

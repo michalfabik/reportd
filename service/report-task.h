@@ -45,9 +45,9 @@ struct _ReportTaskClass {
 
 GType       report_task_get_type(void);
 
-ReportTask *report_task_new     (const gchar *object_path,
-                                 const gchar *problem_path,
-                                 const gchar *workflow_id);
+ReportTask *report_task_new     (const gchar     *object_path,
+                                 const gchar     *problem_path,
+                                 struct workflow *workflow);
 
 G_END_DECLS
 
