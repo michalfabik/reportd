@@ -29,8 +29,16 @@ G_DEFINE_TYPE(ReportService, report_service, G_TYPE_DBUS_OBJECT_SKELETON);
 
 struct _ReportServicePrivate {
     ReportDbusService *service_iface;
-    unsigned long task_cnt;
+    GHashTable        *workflows;
+    unsigned long      task_cnt;
 };
+
+static workflow_t *
+report_service_find_workflow_by_name(ReportService *self,
+                                     const char    *wf_name)
+{
+    return (workflow_t *)g_hash_table_lookup(self->pv->workflows, (gpointer)wf_name);
+}
 
 static gboolean
 report_service_handle_create_task(ReportDbusService     * /*object*/,
@@ -60,7 +68,8 @@ report_service_handle_create_task(ReportDbusService     * /*object*/,
 static gboolean
 report_service_handle_get_workflows(ReportDbusService * /*object*/,
                                     GDBusMethodInvocation *invocation,
-                                    const gchar *arg_problem)
+                                    const gchar           *arg_problem,
+                                    ReportService         *self)
 {
     std::string problem_dir;
 
@@ -76,21 +85,24 @@ report_service_handle_get_workflows(ReportDbusService * /*object*/,
     }
 
     GList *wfs = list_possible_events_glist(problem_dir.c_str(), "workflow");
-    GHashTable *workflow_table = load_workflow_config_data_from_list(wfs,
-                                                                     "/usr/share/libreport/workflows/");
-    g_list_free_full(wfs, free);
-    GList *wf_list = g_hash_table_get_values(workflow_table);
 
     GVariantBuilder top_builder;
     g_variant_builder_init(&top_builder, G_VARIANT_TYPE("a(sss)"));
 
-    for (GList *wf_iter = wf_list; wf_iter; wf_iter = g_list_next(wf_iter)) {
-        workflow_t *w = (workflow_t *)wf_iter->data;
+    for (GList *wf_iter = wfs; wf_iter; wf_iter = g_list_next(wf_iter)) {
+        const char *possible_wf = (const char *)wf_iter->data;
+        workflow_t *wf = report_service_find_workflow_by_name(self,
+                                                              possible_wf);
+
+        if (wf == NULL) {
+            g_message("Possible workflow without configuration: %s", possible_wf);
+            continue;
+        }
 
         GVariant *children[3];
-        children[0] = g_variant_new_string(wf_get_name(w));
-        children[1] = g_variant_new_string(wf_get_screen_name(w));
-        children[2] = g_variant_new_string(wf_get_description(w));
+        children[0] = g_variant_new_string(wf_get_name(wf));
+        children[1] = g_variant_new_string(wf_get_screen_name(wf));
+        children[2] = g_variant_new_string(wf_get_description(wf));
         GVariant *entry = g_variant_new_tuple(children, 3);
 
         g_variant_builder_add_value(&top_builder, entry);
@@ -102,8 +114,7 @@ report_service_handle_get_workflows(ReportDbusService * /*object*/,
 
     g_dbus_method_invocation_return_value(invocation, value);
 
-    g_list_free(wf_list);
-    g_hash_table_destroy(workflow_table);
+    g_list_free(wfs);
 
     return TRUE;
 }
@@ -115,6 +126,7 @@ report_service_init(ReportService *self)
 
     self->pv->service_iface = report_dbus_service_skeleton_new();
     self->pv->task_cnt = 1;
+    self->pv->workflows = load_workflow_config_data(/*the default location*/NULL);
 
     g_signal_connect(self->pv->service_iface,
                      "handle-create-task",
