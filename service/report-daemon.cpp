@@ -115,8 +115,6 @@ ReportDaemon::get_problem_directory(const std::string &problem_entry)
                                       out_fds,
                                       -1);
 
-        batch = range;
-
         Glib::Variant<std::map<std::string, Glib::VariantBase> > data;
         reply.get_child(data);
         for (auto kv : data.get()) {
