@@ -23,6 +23,9 @@
 
 #include <dump_dir.h>
 
+#include <iostream>
+#include <cstring>
+
 using namespace Glib;
 
 static RefPtr<MainLoop> s_main_loop;
@@ -127,6 +130,97 @@ ReportDaemon::get_problem_directory(const std::string &problem_entry)
     }
     dd_close(dd);
     return problem_dir;
+}
+
+void
+ReportDaemon::push_problem_directory(const std::string &problem_dir)
+{
+    if (access(problem_dir.c_str(), R_OK)) {
+        throw std::runtime_error(
+                std::string("Temporary problem directory disappeared: ") + problem_dir);
+    }
+
+    std::string problem_entry("/org/freedesktop/Problems2/Entry");
+    problem_entry.append(problem_dir.begin() + problem_dir.find_last_of('/'), problem_dir.end());
+
+    auto cancellable = Gio::Cancellable::create();
+    auto connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::BUS_TYPE_SYSTEM,
+                                                      cancellable);
+    if (!connection) {
+        throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
+                               "Cannot get system bus");
+    }
+
+    auto info = Glib::RefPtr<Gio::DBus::InterfaceInfo>();
+    auto entry = Gio::DBus::Proxy::create_sync(connection,
+                                               "org.freedesktop.problems",
+                                               problem_entry,
+                                               "org.freedesktop.Problems2.Entry",
+                                               cancellable,
+                                               info,
+                                               Gio::DBus::PROXY_FLAGS_NONE);
+
+    if (!entry) {
+        throw Gio::DBus::Error(Gio::DBus::Error::INVALID_ARGS,
+                               "Problems2 Entry is not accessible");
+    }
+
+    struct dump_dir *dd = dd_opendir(problem_dir.c_str(), 0);
+    if (dd == NULL) {
+        throw std::runtime_error(
+                std::string("Cannot open problem directory: ") + problem_dir);
+    }
+
+    dd_init_next_file(dd);
+
+    char *short_name = NULL;
+    while (dd_get_next_file(dd, &short_name, NULL)) {
+        if (   strcmp("analyzer", short_name) == 0
+            || strcmp("type"    , short_name) == 0
+            || strcmp("time"    , short_name) == 0
+            || strcmp("count"    , short_name) == 0)
+        {
+            /* Ignoring these elements because they should not be changed. */
+            continue;
+        }
+
+        const int fd = openat(dd->dd_fd, short_name, O_RDONLY);
+        if (fd < 0) {
+            std::cerr << "Failed to open '" << short_name << "' : ignoring\n";
+            continue;
+        }
+
+        auto in_fds = Gio::UnixFDList::create();
+        const int pos = in_fds->append(fd);
+        close(fd);
+
+        auto out_fds = Gio::UnixFDList::create();
+
+        GVariantBuilder builder;
+        g_variant_builder_init(&builder, G_VARIANT_TYPE("a{sv}"));
+        g_variant_builder_add(&builder, "{sv}", short_name, g_variant_new("h", pos));
+        GVariant *data = g_variant_builder_end(&builder);
+
+        std::vector<Glib::VariantBase> p(2);
+        p.at(0).init(data, true);
+        p.at(1) = Glib::Variant<int>::create(0);
+
+        auto parameters = Glib::VariantContainerBase::create_tuple(p);
+
+        try {
+            auto reply = entry->call_sync("SaveElements",
+                                      parameters,
+                                      cancellable,
+                                      in_fds,
+                                      out_fds,
+                                      -1);
+        }
+        catch ( const Glib::Error &err ) {
+            std::cerr << "Failed to sync element: '" << short_name << "' "
+                      << err.what() << std::endl;
+        }
+    }
+    dd_close(dd);
 }
 
 void

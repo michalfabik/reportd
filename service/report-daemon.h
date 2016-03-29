@@ -21,7 +21,8 @@
 
 class ReportDaemon {
     public:
-        std::string get_problem_directory (const std::string   &);
+        std::string get_problem_directory  (const std::string &);
+        void        push_problem_directory (const std::string &);
 
         void        register_object       (GDBusObjectSkeleton *);
 

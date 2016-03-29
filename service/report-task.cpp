@@ -120,14 +120,17 @@ report_task_handle_start(ReportDbusTask        * /*object*/,
                          GDBusMethodInvocation *invocation,
                          ReportTask            *self)
 {
-    g_message("Started task!");
-
     GList *event_names = wf_get_event_names(self->pv->workflow);
+
+    report_dbus_task_set_status(self->pv->task_iface, "RUNNING");
 
     std::string problem_dir(ReportDaemon::inst().get_problem_directory(self->pv->problem_path));
     run_event_chain(problem_dir.c_str(), event_names);
 
     g_list_free_full(event_names, free);
+
+    ReportDaemon::inst().push_problem_directory(problem_dir);
+    report_dbus_task_set_status(self->pv->task_iface, "FINISHED");
 
     g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
     return TRUE;
