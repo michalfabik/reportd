@@ -31,23 +31,12 @@ struct _ReportTaskPrivate
 };
 /*** Event running ***/
 
-struct logging_state {
-    bool output_was_produced;
-};
-
-static char *
-do_log(char *log_line, void *)
-{
-    client_log(log_line);
-    return log_line;
-}
-
 static char *
 do_log2(char *log_line, void *param)
 {
-    struct logging_state *l_state = (struct logging_state *)param;
-    l_state->output_was_produced |= (log_line[0] != '\0');
-    return do_log(log_line, param);
+    ReportTask *self = REPORT_TASK(param);
+    report_dbus_task_emit_progress(self->pv->task_iface, log_line);
+    return log_line;
 }
 
 static int export_config_and_run_event(
@@ -75,22 +64,15 @@ static int run_event_on_dir_name_batch(
     return retval;
 }
 
-int run_event_chain(const char *dump_dir_name, GList *chain)
+int run_event_chain(struct run_event_state *run_state, const char *dump_dir_name, GList *chain)
 {
-    struct logging_state l_state;
-
-    struct run_event_state *run_state = new_run_event_state();
-    run_state->logging_callback = do_log2;
-    run_state->logging_param = &l_state;
-
     int retval = 0;
     for (GList *eitem = chain; eitem; eitem = g_list_next(eitem))
     {
-        l_state.output_was_produced = 0;
         const char *event_name = (const char *)eitem->data;
         retval = run_event_on_dir_name_batch(run_state, dump_dir_name, event_name);
 
-        if (retval < 0)
+        if (retval < 0 || retval != 0)
             /* Nothing was run (bad backtrace, user declined, etc... */
             break;
         if (retval == 0 && run_state->children_count == 0)
@@ -98,19 +80,7 @@ int run_event_chain(const char *dump_dir_name, GList *chain)
             printf("Error: no processing is specified for event '%s'\n", event_name);
             retval = 1;
         }
-        else
-        /* If program failed, or if it finished successfully without saying anything... */
-        if (retval != 0 || !l_state.output_was_produced)
-        {
-            char *msg = exit_status_as_string(event_name, run_state->process_status);
-            fputs(msg, stdout);
-            free(msg);
-        }
-        if (retval != 0)
-            break;
     }
-
-    free_run_event_state(run_state);
 
     return retval;
 }
@@ -125,7 +95,14 @@ report_task_handle_start(ReportDbusTask        * /*object*/,
     report_dbus_task_set_status(self->pv->task_iface, "RUNNING");
 
     std::string problem_dir(ReportDaemon::inst().get_problem_directory(self->pv->problem_path));
-    run_event_chain(problem_dir.c_str(), event_names);
+
+    struct run_event_state *run_state = new_run_event_state();
+    run_state->logging_callback = do_log2;
+    run_state->logging_param = self;
+
+    run_event_chain(run_state, problem_dir.c_str(), event_names);
+
+    free_run_event_state(run_state);
 
     g_list_free_full(event_names, free);
 

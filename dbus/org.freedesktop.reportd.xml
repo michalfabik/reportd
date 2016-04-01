@@ -46,6 +46,10 @@
             <!-- no arguments -->
         </method>
 
+        <signal name="Progress">
+            <arg name="line" type="s" direction="out"/>
+        </signal>
+
         <property name="Status" type="s" access="read"/>
 
     </interface>
