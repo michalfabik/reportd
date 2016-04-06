@@ -94,7 +94,7 @@ report_task_handle_start(ReportDbusTask        * /*object*/,
 
     report_dbus_task_set_status(self->pv->task_iface, "RUNNING");
 
-    std::string problem_dir(ReportDaemon::inst().get_problem_directory(self->pv->problem_path));
+    std::string problem_dir{ReportDaemon::inst().get_problem_directory(self->pv->problem_path)};
 
     struct run_event_state *run_state = new_run_event_state();
     run_state->logging_callback = do_log2;

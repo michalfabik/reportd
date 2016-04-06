@@ -58,7 +58,7 @@ ReportDaemon::inst()
 std::string
 ReportDaemon::get_problem_directory(const std::string &problem_entry)
 {
-    std::string problem_dir("/var/tmp");
+    std::string problem_dir{"/var/tmp"};
     problem_dir.append(problem_entry.begin() + problem_entry.find_last_of('/'), problem_entry.end());
 
     if (!access(problem_dir.c_str(), R_OK))
@@ -140,7 +140,7 @@ ReportDaemon::push_problem_directory(const std::string &problem_dir)
                 std::string("Temporary problem directory disappeared: ") + problem_dir);
     }
 
-    std::string problem_entry("/org/freedesktop/Problems2/Entry");
+    std::string problem_entry{"/org/freedesktop/Problems2/Entry"};
     problem_entry.append(problem_dir.begin() + problem_dir.find_last_of('/'), problem_dir.end());
 
     auto cancellable = Gio::Cancellable::create();
@@ -168,7 +168,7 @@ ReportDaemon::push_problem_directory(const std::string &problem_dir)
     struct dump_dir *dd = dd_opendir(problem_dir.c_str(), 0);
     if (dd == NULL) {
         throw std::runtime_error(
-                std::string("Cannot open problem directory: ") + problem_dir);
+                std::string{"Cannot open problem directory: "} + problem_dir);
     }
 
     dd_init_next_file(dd);

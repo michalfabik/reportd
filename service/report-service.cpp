@@ -64,7 +64,7 @@ report_service_handle_create_task(ReportDbusService     * /*object*/,
     }
 
     unsigned long task_id = self->pv->task_cnt++;
-    std::string task_path(std::string(REPORTD_DBUS_TASK_BASE_PATH) + std::to_string(task_id));
+    std::string task_path{std::string{REPORTD_DBUS_TASK_BASE_PATH} + std::to_string(task_id)};
 
     ReportTask *t = report_task_new(task_path.c_str(),
                                     arg_problem,
