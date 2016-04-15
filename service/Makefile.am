@@ -1,4 +1,4 @@
-bin_PROGRAMS = \
+libexec_PROGRAMS = \
 	reportd
 
 reportd_SOURCES = \

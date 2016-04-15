@@ -42,6 +42,9 @@ PKG_CHECK_MODULES([GLIBMM],
         giomm-2.4)
 PKG_CHECK_MODULES([LIBREPORT], [libreport])
 
+DBUS_SERVICES_DIR="${datadir}/dbus-1/services"
+AC_SUBST(DBUS_SERVICES_DIR)
+
 CFLAGS="$CFLAGS -Wall -Wextra -Werror -std=c11"
 CXXFLAGS="$CXXFLAGS -Wall -Wextra -Werror -std=c++14"
 
