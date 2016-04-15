@@ -29,12 +29,11 @@ class ReportDaemon {
 
         static ReportDaemon& inst();
 
-        static void on_name_acquired      (GDBusConnection *,
-                                           const gchar *,
-                                           gpointer);
+        static void on_name_acquired(const Glib::RefPtr<Gio::DBus::Connection> &connection,
+                                     const Glib::ustring                       &name);
 
     private:
-        void settle_connection(GDBusConnection *);
+        void settle_connection(const Glib::RefPtr<Gio::DBus::Connection> &connection);
 
         ReportDaemon();
         ReportDaemon(const ReportDaemon &) = delete;

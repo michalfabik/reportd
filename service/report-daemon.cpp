@@ -24,7 +24,10 @@
 #include <dump_dir.h>
 
 #include <iostream>
+
+#include <cstdlib>
 #include <cstring>
+#include <err.h>
 
 using namespace Glib;
 
@@ -224,7 +227,7 @@ ReportDaemon::push_problem_directory(const std::string &problem_dir)
 }
 
 void
-ReportDaemon::settle_connection(GDBusConnection *connection)
+ReportDaemon::settle_connection(const Glib::RefPtr<Gio::DBus::Connection> &connection)
 {
     if (d->connected()) {
         g_warning("report-daemon already settled a connection");
@@ -236,15 +239,14 @@ ReportDaemon::settle_connection(GDBusConnection *connection)
     d->report_service = report_service_new(REPORTD_DBUS_SERVICE_PATH);
     g_dbus_object_manager_server_export(d->object_manager, G_DBUS_OBJECT_SKELETON(d->report_service));
 
-    g_dbus_object_manager_server_set_connection(d->object_manager, connection);
+    g_dbus_object_manager_server_set_connection(d->object_manager, connection->gobj());
 }
 
 /* static */ void
-ReportDaemon::on_name_acquired(GDBusConnection *connection,
-                 const gchar      *name,
-                 gpointer         )
+ReportDaemon::on_name_acquired(const Glib::RefPtr<Gio::DBus::Connection> &connection,
+                               const Glib::ustring                       &name)
 {
-    g_debug("Session bus with '%s' acquired", name);
+    g_debug("Session bus with '%s' acquired", name.c_str());
     ReportDaemon::inst().settle_connection(connection);
 }
 
@@ -260,13 +262,18 @@ ReportDaemon::register_object(GDBusObjectSkeleton *object)
     g_dbus_object_manager_server_export(d->object_manager, object);
 }
 
+static void
+on_bus_acquired(const Glib::RefPtr<Gio::DBus::Connection>&,
+                const Glib::ustring                      & name)
+{
+    g_debug("DBus name has been acquired: %s", name.c_str());
+}
 
 static void
-on_name_lost(GDBusConnection *,
-             const gchar     *name,
-             gpointer        )
+on_name_lost(const Glib::RefPtr<Gio::DBus::Connection> &,
+             const Glib::ustring                       &name)
 {
-    g_warning("DBus name has been lost: %s", name);
+    g_warning("DBus name has been lost: %s", name.c_str());
     s_main_loop->quit();
 }
 
@@ -282,14 +289,23 @@ main(void)
 {
     Gio::init();
 
-    guint bus_name_id = g_bus_own_name(G_BUS_TYPE_SESSION,
-                                       REPORTD_DBUS_BUS_NAME,
-                                       G_BUS_NAME_OWNER_FLAGS_NONE,
-                                       NULL,
-                                       ReportDaemon::on_name_acquired,
-                                       on_name_lost,
-                                       NULL,
-                                       NULL);
+    { /* Test availability of Session bus */
+        try {
+            auto connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::BUS_TYPE_SESSION);
+            if (!connection) {
+                errx(EXIT_FAILURE, "The user's session bus is not available.");
+            }
+        }
+        catch(const Glib::Error &error) {
+            errx(EXIT_FAILURE, "Failed to connect to user's session bus : %s", error.what().c_str());
+        }
+    }
+
+    guint bus_name_id = Gio::DBus::own_name(Gio::DBus::BusType::BUS_TYPE_SESSION,
+                                            REPORTD_DBUS_BUS_NAME,
+                                            sigc::ptr_fun(on_bus_acquired),
+                                            sigc::ptr_fun(ReportDaemon::on_name_acquired),
+                                            sigc::ptr_fun(on_name_lost));
 
     s_main_loop = MainLoop::create();
 
@@ -299,7 +315,7 @@ main(void)
     s_main_loop->run();
 
     if (bus_name_id > 0) {
-        g_bus_unown_name(bus_name_id);
+        Gio::DBus::unown_name(bus_name_id);
     }
 
     return bus_name_id > 0;
