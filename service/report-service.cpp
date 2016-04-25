@@ -63,6 +63,8 @@ report_service_handle_create_task(ReportDbusService     * /*object*/,
         return TRUE;
     }
 
+    g_debug("Creating task for problem '%s'", arg_problem);
+
     unsigned long task_id = self->pv->task_cnt++;
     std::string task_path{std::string{REPORTD_DBUS_TASK_BASE_PATH} + std::to_string(task_id)};
 
@@ -96,6 +98,8 @@ report_service_handle_get_workflows(ReportDbusService * /*object*/,
                                               err.what().c_str());
         return TRUE;
     }
+
+    g_debug("Getting workflows for problem directory '%s'", problem_dir.c_str());
 
     GList *wfs = list_possible_events_glist(problem_dir.c_str(), "workflow");
 

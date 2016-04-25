@@ -23,6 +23,7 @@
 
 #include <dump_dir.h>
 
+#include <set>
 #include <iostream>
 
 #include <cstdlib>
@@ -39,6 +40,33 @@ class ReportDaemonPrivate {
         ReportService *report_service;
 
         bool connected() { return this->object_manager != 0; }
+
+        Glib::RefPtr<Gio::DBus::Proxy> get_problems_entry_proxy(const std::string& problem_entry)
+        {
+            auto cancellable = Gio::Cancellable::create();
+            auto connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::BUS_TYPE_SYSTEM,
+                                                              cancellable);
+            if (!connection) {
+                throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
+                                       "Cannot get system bus");
+            }
+
+            auto info = Glib::RefPtr<Gio::DBus::InterfaceInfo>();
+            auto entry = Gio::DBus::Proxy::create_sync(connection,
+                                                       "org.freedesktop.problems",
+                                                       problem_entry,
+                                                       "org.freedesktop.Problems2.Entry",
+                                                       cancellable,
+                                                       info,
+                                                       Gio::DBus::PROXY_FLAGS_NONE);
+
+            if (!entry) {
+                throw Gio::DBus::Error(Gio::DBus::Error::INVALID_ARGS,
+                                       "Problems2 Entry is not accessible");
+            }
+
+            return entry;
+        }
 };
 
 ReportDaemon::ReportDaemon() :
@@ -62,45 +90,32 @@ std::string
 ReportDaemon::get_problem_directory(const std::string &problem_entry)
 {
     std::string problem_dir{"/var/tmp"};
-    problem_dir.append(problem_entry.begin() + problem_entry.find_last_of('/'), problem_entry.end());
+    problem_dir.append(problem_entry.begin() + problem_entry.find_last_of('/'),
+                       problem_entry.end());
 
-    if (!access(problem_dir.c_str(), R_OK))
+    if (!access(problem_dir.c_str(), R_OK)) {
+        g_debug("Already pulled problem entry '%s'", problem_entry.c_str());
         return problem_dir;
-
-    auto cancellable = Gio::Cancellable::create();
-    auto connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::BUS_TYPE_SYSTEM,
-                                                      cancellable);
-    if (!connection) {
-        throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
-                               "Cannot get system bus");
     }
 
-    auto info = Glib::RefPtr<Gio::DBus::InterfaceInfo>();
-    auto entry = Gio::DBus::Proxy::create_sync(connection,
-                                               "org.freedesktop.problems",
-                                               problem_entry,
-                                               "org.freedesktop.Problems2.Entry",
-                                               cancellable,
-                                               info,
-                                               Gio::DBus::PROXY_FLAGS_NONE);
+    g_debug("Pulling problem entry '%s'", problem_entry.c_str());
 
-    if (!entry) {
-        throw Gio::DBus::Error(Gio::DBus::Error::INVALID_ARGS,
-                               "Problems2 Entry is not accessible");
-    }
-
+    auto entry = this->d->get_problems_entry_proxy(problem_entry);
 
     Glib::Variant<std::vector<Glib::ustring> > elements;
     entry->get_cached_property(elements, "Elements");
 
     if (!elements) {
-        throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
-                               "Problems2 Entry does not have property Elements");
+        g_debug("Problem entry not accessible: '%s'", problem_entry.c_str());
+        throw Gio::DBus::Error(Gio::DBus::Error::ACCESS_DENIED,
+                               "Problems2 Entry is not accessible");
     }
 
     auto elem_vector = elements.get();
-    const size_t elems(elem_vector.size());
-    const size_t dbus_fd_limit(16);
+    const size_t elems = elem_vector.size();
+
+    /* D-Bus can pass only the following number of FDs in a single message */
+    const size_t dbus_fd_limit = 16;
 
     struct dump_dir *dd = dd_create_skeleton(problem_dir.c_str(), -1, 0600, 0);
 
@@ -112,6 +127,7 @@ ReportDaemon::get_problem_directory(const std::string &problem_entry)
         auto parameters = Glib::VariantContainerBase::create_tuple({Glib::Variant<std::vector<Glib::ustring> >::create(b),
                                                                     Glib::Variant<int>::create(1)});
 
+        auto cancellable = Gio::Cancellable::create();
         auto in_fds = Gio::UnixFDList::create();
         auto out_fds = Gio::UnixFDList::create();
         auto reply = entry->call_sync("ReadElements",
@@ -131,6 +147,7 @@ ReportDaemon::get_problem_directory(const std::string &problem_entry)
             close(fd);
         }
     }
+
     dd_close(dd);
     return problem_dir;
 }
@@ -138,35 +155,22 @@ ReportDaemon::get_problem_directory(const std::string &problem_entry)
 void
 ReportDaemon::push_problem_directory(const std::string &problem_dir)
 {
+    g_debug("Pushing dump directory '%s'", problem_dir.c_str());
+
+    /* Ignoring these elements because they should not be changed. */
+    static std::set<std::string> ignored_elements = {
+        "analyzer", "type", "time", "count"};
+
     if (access(problem_dir.c_str(), R_OK)) {
         throw std::runtime_error(
                 std::string("Temporary problem directory disappeared: ") + problem_dir);
     }
 
     std::string problem_entry{"/org/freedesktop/Problems2/Entry"};
-    problem_entry.append(problem_dir.begin() + problem_dir.find_last_of('/'), problem_dir.end());
+    problem_entry.append(problem_dir.begin() + problem_dir.find_last_of('/'),
+                         problem_dir.end());
 
-    auto cancellable = Gio::Cancellable::create();
-    auto connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::BUS_TYPE_SYSTEM,
-                                                      cancellable);
-    if (!connection) {
-        throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
-                               "Cannot get system bus");
-    }
-
-    auto info = Glib::RefPtr<Gio::DBus::InterfaceInfo>();
-    auto entry = Gio::DBus::Proxy::create_sync(connection,
-                                               "org.freedesktop.problems",
-                                               problem_entry,
-                                               "org.freedesktop.Problems2.Entry",
-                                               cancellable,
-                                               info,
-                                               Gio::DBus::PROXY_FLAGS_NONE);
-
-    if (!entry) {
-        throw Gio::DBus::Error(Gio::DBus::Error::INVALID_ARGS,
-                               "Problems2 Entry is not accessible");
-    }
+    auto entry = this->d->get_problems_entry_proxy(problem_entry);
 
     struct dump_dir *dd = dd_opendir(problem_dir.c_str(), 0);
     if (dd == NULL) {
@@ -178,18 +182,14 @@ ReportDaemon::push_problem_directory(const std::string &problem_dir)
 
     char *short_name = NULL;
     while (dd_get_next_file(dd, &short_name, NULL)) {
-        if (   strcmp("analyzer", short_name) == 0
-            || strcmp("type"    , short_name) == 0
-            || strcmp("time"    , short_name) == 0
-            || strcmp("count"    , short_name) == 0)
-        {
-            /* Ignoring these elements because they should not be changed. */
+        /* Skip ignored elements */
+        if (ignored_elements.count(short_name) != 0) {
             continue;
         }
 
         const int fd = openat(dd->dd_fd, short_name, O_RDONLY);
         if (fd < 0) {
-            std::cerr << "Failed to open '" << short_name << "' : ignoring\n";
+            g_warning("Failed to open '%s' : ignoring", short_name);
             continue;
         }
 
@@ -201,7 +201,12 @@ ReportDaemon::push_problem_directory(const std::string &problem_dir)
 
         GVariantBuilder builder;
         g_variant_builder_init(&builder, G_VARIANT_TYPE("a{sv}"));
-        g_variant_builder_add(&builder, "{sv}", short_name, g_variant_new("h", pos));
+
+        g_variant_builder_add(&builder,
+                              "{sv}",
+                              short_name,
+                              g_variant_new("h", pos));
+
         GVariant *data = g_variant_builder_end(&builder);
 
         std::vector<Glib::VariantBase> p(2);
@@ -211,6 +216,7 @@ ReportDaemon::push_problem_directory(const std::string &problem_dir)
         auto parameters = Glib::VariantContainerBase::create_tuple(p);
 
         try {
+            auto cancellable = Gio::Cancellable::create();
             auto reply = entry->call_sync("SaveElements",
                                       parameters,
                                       cancellable,
@@ -219,8 +225,10 @@ ReportDaemon::push_problem_directory(const std::string &problem_dir)
                                       -1);
         }
         catch ( const Glib::Error &err ) {
-            std::cerr << "Failed to sync element: '" << short_name << "' "
-                      << err.what() << std::endl;
+            g_warning("Failed to sync element '%s': %s",
+                      short_name,
+                      err.what().c_str());
+            continue;
         }
     }
     dd_close(dd);
@@ -278,9 +286,9 @@ on_name_lost(const Glib::RefPtr<Gio::DBus::Connection> &,
 }
 
 static gboolean
-on_signal_quit(gpointer data)
+on_signal_quit(gpointer)
 {
-    (*static_cast<RefPtr<MainLoop> *>(data))->quit();
+    s_main_loop->quit();
     return FALSE;
 }
 
@@ -309,8 +317,8 @@ main(void)
 
     s_main_loop = MainLoop::create();
 
-    g_unix_signal_add(SIGINT,  on_signal_quit, &s_main_loop);
-    g_unix_signal_add(SIGTERM, on_signal_quit, &s_main_loop);
+    g_unix_signal_add(SIGINT,  on_signal_quit, NULL);
+    g_unix_signal_add(SIGTERM, on_signal_quit, NULL);
 
     s_main_loop->run();
 
