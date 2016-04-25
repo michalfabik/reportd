@@ -7,7 +7,7 @@ run: all
 	service/reportd
 
 debug: all
-	libtool --mode=execute gdb --ex=run --args service/reportd
+	G_MESSAGES_DEBUG=all libtool --mode=execute gdb --ex=run --args service/reportd
 
 RPM_DIRS = --define "_sourcedir $(abs_top_srcdir)" \
 	--define "_specdir $(abs_top_srcdir)/package" \
