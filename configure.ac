@@ -52,7 +52,6 @@ AC_CONFIG_FILES([
         Makefile
         po/Makefile.in
         dbus/Makefile
-        dbus/org.freedesktop.reportd.service
         service/Makefile
 ])
 AC_OUTPUT

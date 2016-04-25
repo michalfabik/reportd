@@ -37,6 +37,10 @@ $(DBUS_GENERATED): org.freedesktop.reportd.xml
 		--generate-c-code report-dbus-generated \
 		--c-namespace ReportDbus $<
 
+org.freedesktop.reportd.service: org.freedesktop.reportd.service.in
+	@sed -e "s|\@libexecdir\@|$(libexecdir)|g" \
+         $< >$@
+
 EXTRA_DIST = \
 	$(DBUS_XML_DEFINITIONS) \
 	$(service_in_files) \
