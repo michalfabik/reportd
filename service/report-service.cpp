@@ -31,7 +31,61 @@ struct _ReportServicePrivate {
     ReportDbusService *service_iface;
     GHashTable        *workflows;
     unsigned long      task_cnt;
+    Glib::RefPtr<Gio::DBus::Proxy> problems_session;
 };
+
+static Glib::RefPtr<Gio::DBus::Proxy>
+get_problems_session(ReportServicePrivate *pv)
+{
+    if (!pv->problems_session) {
+        auto cancellable = Gio::Cancellable::create();
+        auto connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::BUS_TYPE_SYSTEM,
+                                                          cancellable);
+        if (!connection) {
+            throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
+                                   "Cannot get system bus");
+        }
+
+        auto info = Glib::RefPtr<Gio::DBus::InterfaceInfo>();
+        auto problems2 = Gio::DBus::Proxy::create_sync(connection,
+                                                       "org.freedesktop.problems",
+                                                       "/org/freedesktop/Problems2",
+                                                       "org.freedesktop.Problems2",
+                                                       cancellable,
+                                                       info,
+                                                       Gio::DBus::PROXY_FLAGS_NONE);
+        if (!problems2) {
+            throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
+                                   "Problems2 not accessible");
+        }
+
+        Glib::ustring session_path;
+        try {
+            auto retval = problems2->call_sync("GetSession",
+                                               cancellable);
+            auto path = Glib::VariantBase::cast_dynamic<Glib::Variant<Glib::ustring> >(retval.get_child(0));
+            session_path = path.get();
+        }
+        catch ( const Glib::Error &err ) {
+            g_warning("Cannot get Problems2 Session: %s", err.what().c_str());
+            return {};
+        }
+
+        pv->problems_session = Gio::DBus::Proxy::create_sync(connection,
+                                                             "org.freedesktop.problems",
+                                                             session_path,
+                                                             "org.freedesktop.Problems2.Session",
+                                                             cancellable,
+                                                             info,
+                                                             Gio::DBus::PROXY_FLAGS_NONE);
+        if (!pv->problems_session) {
+            throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
+                                   "Own Problems2 Session not accessible");
+        }
+    }
+
+    return pv->problems_session;
+}
 
 static workflow_t *
 report_service_find_workflow_by_name(ReportService *self,
@@ -136,6 +190,124 @@ report_service_handle_get_workflows(ReportDbusService * /*object*/,
     return TRUE;
 }
 
+class ReportServicePendingAuthorization
+{
+    private:
+        GDBusMethodInvocation *invocation;
+        sigc::connection       connection;
+
+    public:
+        ReportServicePendingAuthorization(GDBusMethodInvocation *inv) :
+            invocation{inv}
+        {}
+
+        void set_connection(sigc::connection connection)
+        {
+            this->connection = connection;
+        }
+
+        void operator()(const Glib::ustring &,
+                        const Glib::ustring &signal_name,
+                        const Glib::VariantContainerBase &parameters)
+        {
+            if (signal_name != "AuthorizationChanged") {
+                return;
+            }
+
+            Glib::VariantBase child_status;
+
+            /* because VariantContianerBase::get_child(int) is non-const */
+            parameters.get_child(child_status, 0);
+
+            const auto var_status = Glib::VariantBase::cast_dynamic< Glib::Variant<gint32> >(child_status);
+            gint32 status = var_status.get();
+
+            g_debug("AuthorizationChanged %i", status);
+
+            /* Pending Authorization request */
+            if (status == 1) {
+                return;
+            }
+
+            if (status == 0) {
+                g_dbus_method_invocation_return_value(this->invocation, g_variant_new("()"));
+            }
+            else {
+                g_dbus_method_invocation_return_error(this->invocation,
+                        G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+                        "reportd's Problems2 Session authorization request failed");
+            }
+
+            this->connection.disconnect();
+        }
+};
+
+
+static gboolean
+report_service_handle_authorize_problems_session(ReportDbusService     * /*object*/,
+                                                 GDBusMethodInvocation *invocation,
+                                                 gint32                /*flags*/,
+                                                 ReportService         *self)
+{
+    g_debug("Authorizing reportd's Problems2 Session");
+
+    auto session = get_problems_session(self->pv);
+
+    auto p = ReportServicePendingAuthorization{invocation};
+    auto connection = session->signal_signal().connect(p);
+
+    auto cancellable = Gio::Cancellable::create();
+
+    gint32 code;
+    try {
+        GVariantBuilder builder;
+        g_variant_builder_init(&builder, G_VARIANT_TYPE("a{sv}"));
+
+        const auto parameters = Glib::VariantContainerBase::create_tuple(Glib::VariantBase{g_variant_builder_end(&builder)});
+        const auto retval = session->call_sync("Authorize", cancellable, parameters);
+
+        Glib::VariantBase child_code;
+        retval.get_child(child_code, 0);
+
+        const auto var_code = Glib::VariantBase::cast_dynamic< Glib::Variant<gint32> >(child_code);
+        code = var_code.get();
+    }
+    catch (const Glib::Error &err) {
+        g_warning("Authorization call failed: %s", err.what().c_str());
+        g_dbus_method_invocation_return_error(invocation,
+                G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+                "reportd's Problems2 Session cannot be Authorized");
+        return TRUE;
+    }
+
+    /* Request accepted */
+    if (code == 1) {
+        return TRUE;
+    }
+
+    /* Already authorized */
+    if (code == 0) {
+        g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
+    }
+
+    /* An error occurred */
+    if (code == -1) {
+        g_dbus_method_invocation_return_error(invocation,
+                G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+                "Failed to create Problems2 Session authorization request");
+    }
+
+    /* Authorization is already pending */
+    if (code == 2)  {
+        g_dbus_method_invocation_return_error(invocation,
+                G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+                "Problems2 Session authorization request already pending");
+    }
+
+    connection.disconnect();
+    return TRUE;
+}
+
 static void
 report_service_init(ReportService *self)
 {
@@ -153,6 +325,11 @@ report_service_init(ReportService *self)
     g_signal_connect(self->pv->service_iface,
                      "handle-get-workflows",
                      G_CALLBACK(report_service_handle_get_workflows),
+                     self);
+
+    g_signal_connect(self->pv->service_iface,
+                     "handle-authorize-problems-session",
+                     G_CALLBACK(report_service_handle_authorize_problems_session),
                      self);
 
     g_dbus_object_skeleton_add_interface(G_DBUS_OBJECT_SKELETON(self),

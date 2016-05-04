@@ -26,6 +26,17 @@
             <arg name="workflows" type="a(sss)" direction="out"/>
         </method>
 
+        <!--
+          Try to authorize problems session. The client can use Authorized
+          Session and see problems of all users and the service would not be
+          allowed to access the passed problem entries without authorization.
+          In this case authorization of own problem session should be automatic.
+        -->
+        <method name="AuthorizeProblemsSession">
+            <!-- For future needs -->
+            <arg name="flags" type="i" direction="in"/>
+        </method>
+
     </interface>
 
     <!--
