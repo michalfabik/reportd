@@ -3,7 +3,7 @@
 
 Name:		reportd
 Version:	0.1
-Release:	1%{?dist}
+Release:	2%{?dist}
 Summary:	Service reporting org.freedesktop.Problems2 entries.
 
 Group:		Applications/System
@@ -12,6 +12,11 @@ URL:		https://github.com/jfilak/%{name}
 #Source0:	https://github.com/jfilak/%{name}/archive/%{commit}/%{name}-%{version}-%{shortcommit}.tar.gz
 Source0:	https://github.com/jfilak/%{name}/archive/%{commit}/%{name}-%{version}.tar.gz
 
+BuildRequires:	libtool
+BuildRequires:	intltool
+BuildRequires:	automake
+BuildRequires:	autoconf
+BuildRequires:	glibmm24-devel
 BuildRequires:	libreport-devel
 
 %description
@@ -23,6 +28,7 @@ A D-Buse service that exports libreport functionality in D-Bus interface.
 
 
 %build
+autoreconf -f
 %configure
 make %{?_smp_mflags}
 
@@ -38,5 +44,10 @@ make %{?_smp_mflags}
 
 
 %changelog
-* Thu Apr 14 2016 Jakub Filak <jfilak@redhat.com> - 0.0.1-1
+* Thu May 19 2016 Jakub Filak <jfilak@redhat.com> - 0.1-2
+- Add all BuildRequires
+- Verbose command line argument
+- Cache moved to /var/run/user/reportd
+
+* Thu Apr 14 2016 Jakub Filak <jfilak@redhat.com> - 0.1-1
 - Initial packaging
