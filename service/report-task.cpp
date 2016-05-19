@@ -75,6 +75,7 @@ int run_event_chain(struct run_event_state *run_state, const char *dump_dir_name
         if (retval < 0 || retval != 0)
             /* Nothing was run (bad backtrace, user declined, etc... */
             break;
+
         if (retval == 0 && run_state->children_count == 0)
         {
             printf("Error: no processing is specified for event '%s'\n", event_name);
@@ -93,6 +94,7 @@ report_task_handle_start(ReportDbusTask        * /*object*/,
     GList *event_names = wf_get_event_names(self->pv->workflow);
 
     report_dbus_task_set_status(self->pv->task_iface, "RUNNING");
+    g_debug("Started task: %s", self->pv->problem_path);
 
     std::string problem_dir{ReportDaemon::inst().get_problem_directory(self->pv->problem_path)};
 
@@ -108,6 +110,7 @@ report_task_handle_start(ReportDbusTask        * /*object*/,
 
     ReportDaemon::inst().push_problem_directory(problem_dir);
     report_dbus_task_set_status(self->pv->task_iface, "FINISHED");
+    g_debug("Finished task: %s", self->pv->problem_path);
 
     g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
     return TRUE;
@@ -116,9 +119,9 @@ report_task_handle_start(ReportDbusTask        * /*object*/,
 static gboolean
 report_task_handle_cancel(ReportDbusTask        * /*object*/,
                           GDBusMethodInvocation *invocation,
-                          gpointer               /*user_data*/)
+                          ReportTask            *self)
 {
-    g_message("Canceled task!");
+    g_debug("Canceled task: %s", self->pv->problem_path);
     g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
     return TRUE;
 }
