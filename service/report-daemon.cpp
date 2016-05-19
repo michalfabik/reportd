@@ -28,6 +28,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <sstream>
 #include <err.h>
 
 using namespace Glib;
@@ -36,6 +37,7 @@ static RefPtr<MainLoop> s_main_loop;
 
 class ReportDaemonPrivate {
     public:
+        std::string cachedir;
         GDBusObjectManagerServer *object_manager;
         ReportService *report_service;
 
@@ -67,6 +69,25 @@ class ReportDaemonPrivate {
 
             return entry;
         }
+
+        std::string get_cachedir()
+        {
+            if (this->cachedir.empty())
+            {
+                std::stringstream sschd;
+                sschd << "/var/run/user/" << getuid() <<  "/reportd";
+
+                std::string tmpname = {sschd.str()};
+                if (g_mkdir_with_parents(tmpname.c_str(), 0700) != 0) {
+                    throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
+                            std::string{"Cannot create directory "} + tmpname);
+                }
+
+                this->cachedir = tmpname;
+            }
+
+            return this->cachedir;
+        }
 };
 
 ReportDaemon::ReportDaemon() :
@@ -89,7 +110,8 @@ ReportDaemon::inst()
 std::string
 ReportDaemon::get_problem_directory(const std::string &problem_entry)
 {
-    std::string problem_dir{"/var/tmp"};
+    std::string problem_dir = d->get_cachedir();
+
     problem_dir.append(problem_entry.begin() + problem_entry.find_last_of('/'),
                        problem_entry.end());
 
