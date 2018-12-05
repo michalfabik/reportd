@@ -17,33 +17,14 @@
 #ifndef __REPORT_SERVICE_H__
 #define __REPORT_SERVICE_H__
 
-#include <giomm.h>
-
-#include "report-dbus-generated.h"
+#include <gio/gio.h>
 
 G_BEGIN_DECLS
 
-#define REPORT_TYPE_SERVICE            (report_service_get_type())
-#define REPORT_SERVICE(inst)           (G_TYPE_CHECK_INSTANCE_CAST ((inst), REPORT_TYPE_SERVICE, ReportService))
-#define REPORT_IS_SERVICE(inst)        (G_TYPE_CHECK_INSTANCE_TYPE ((inst), REPORT_TYPE_SERVICE))
-#define REPORT_SERVICE_CLASS(klass)    (G_TYPE_CHECK_CLASS_CAST ((klass), REPORT_TYPE_SERVICE, ReportServiceClass))
-#define REPORT_IS_SERVICE_CLASS(klass) (G_TYPE_CHECK_CLASS_TYPE ((klass), REPORT_TYPE_SERVICE))
-#define REPORT_SERVICE_GET_CLASS(obj)  (G_TYPE_INSTANCE_GET_CLASS ((obj), REPORT_TYPE_SERVICE, ReportServiceClass))
+#define REPORT_TYPE_SERVICE report_service_get_type()
 
-typedef struct _ReportService ReportService;
-typedef struct _ReportServiceClass ReportServiceClass;
-typedef struct _ReportServicePrivate ReportServicePrivate;
-
-struct _ReportService {
-	ReportDbusServiceSkeleton parent;
-	ReportServicePrivate *pv;
-};
-
-struct _ReportServiceClass {
-	ReportDbusServiceSkeletonClass parent_class;
-};
-
-GType          report_service_get_type(void);
+G_DECLARE_FINAL_TYPE(ReportService, report_service, REPORT, SERVICE,
+                     GDBusObjectSkeleton)
 
 ReportService *report_service_new(const gchar *object_path);
 
