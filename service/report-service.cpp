@@ -11,8 +11,6 @@
  *
  * Author: Jakub Filak <jfilak@redhat.com>
  */
-#include "config.h"
-
 #include "report-service.h"
 #include "report-task.h"
 #include "report-daemon.h"
