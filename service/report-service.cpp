@@ -102,6 +102,8 @@ report_service_handle_create_task(ReportDbusService     * /*object*/,
                                   const gchar           *arg_problem,
                                   ReportService         *self)
 {
+    const char *object_path;
+
     if (self->task_cnt == ULONG_MAX) {
         g_dbus_method_invocation_return_error(invocation,
                 G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
@@ -120,16 +122,15 @@ report_service_handle_create_task(ReportDbusService     * /*object*/,
 
     g_debug("Creating task for problem '%s'", arg_problem);
 
-    unsigned long task_id = self->task_cnt++;
-    std::string task_path{std::string{REPORTD_DBUS_TASK_BASE_PATH} + std::to_string(task_id)};
-
-    ReportTask *t = report_task_new(task_path.c_str(),
+    ReportTask *t = report_task_new(REPORTD_DBUS_TASK_PATH,
                                     arg_problem,
                                     wf);
 
     ReportDaemon::inst().register_object(G_DBUS_OBJECT_SKELETON(t));
 
-    GVariant *retval = g_variant_new("(o)", task_path.c_str());
+    object_path = g_dbus_object_get_object_path(G_DBUS_OBJECT(t));
+
+    GVariant *retval = g_variant_new("(o)", object_path);
     g_dbus_method_invocation_return_value(invocation, retval);
 
     return TRUE;

@@ -289,7 +289,7 @@ ReportDaemon::register_object(GDBusObjectSkeleton *object)
         return;
     }
 
-    g_dbus_object_manager_server_export(d->object_manager, object);
+    g_dbus_object_manager_server_export_uniquely(d->object_manager, object);
 }
 
 static void
