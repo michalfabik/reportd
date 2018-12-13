@@ -61,8 +61,23 @@
             <arg name="line" type="s" direction="out"/>
         </signal>
 
+        <signal name="Prompt">
+          <arg name="path" type="s"/>
+          <arg name="message" type="s"/>
+          <arg name="type" type="u"/>
+        </signal>
+
         <property name="Status" type="s" access="read"/>
 
+    </interface>
+
+    <interface name="org.freedesktop.reportd.Task.Prompt">
+      <property name="Input" type="s" access="write"/>
+      <property name="Remember" type="b" access="write"/>
+      <property name="Response" type="b" access="write"/>
+
+      <method name="Commit">
+      </method>
     </interface>
 
 <node name="/">

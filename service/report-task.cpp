@@ -16,8 +16,11 @@
 #include "report-daemon.h"
 #include "report-dbus-generated.h"
 
+#include <report-dbus-constants.h>
+
 #include <workflow.h>
 #include <client.h>
+#include <internal_libreport.h>
 #include <run_event.h>
 
 struct _ReportTask
@@ -30,6 +33,15 @@ struct _ReportTask
 };
 
 G_DEFINE_TYPE(ReportTask, report_task, G_TYPE_DBUS_OBJECT_SKELETON)
+
+typedef enum
+{
+    ASK,
+    ASK_YES_NO,
+    ASK_YES_NO_YESFOREVER,
+    ASK_YES_NO_SAVE,
+    ASK_PASSWORD,
+} PromptType;
 
 /*** Event running ***/
 
@@ -89,7 +101,159 @@ int run_event_chain(struct run_event_state *run_state, const char *dump_dir_name
 }
 
 static gboolean
-report_task_handle_start(ReportDbusTask        * /*object*/,
+report_task_prompt_handle_commit(ReportDbusTaskPrompt  *object,
+                                 GDBusMethodInvocation *invocation,
+                                 gpointer               user_data)
+{
+    g_object_set_data(G_OBJECT(object), "handled", GINT_TO_POINTER(1));
+
+    return TRUE;
+}
+
+static ReportDbusTaskPrompt *
+report_task_emit_prompt(ReportTask *self,
+                        const char *message,
+                        PromptType  type)
+{
+    g_autoptr(GDBusObjectSkeleton) prompt_skeleton = NULL;
+    ReportDbusTaskPrompt *prompt_interface = NULL;
+    const char *object_path;
+
+    prompt_skeleton = g_dbus_object_skeleton_new(REPORTD_DBUS_TASK_PROMPT_PATH);
+    prompt_interface = report_dbus_task_prompt_skeleton_new();
+
+    g_dbus_object_skeleton_add_interface(prompt_skeleton,
+                                         G_DBUS_INTERFACE_SKELETON(prompt_interface));
+
+    ReportDaemon::inst().register_object(prompt_skeleton);
+
+    object_path = g_dbus_object_get_object_path(G_DBUS_OBJECT(prompt_skeleton));
+
+    g_signal_connect(prompt_interface, "handle-commit",
+                     G_CALLBACK(report_task_prompt_handle_commit), NULL);
+
+    report_dbus_task_emit_prompt(self->task_iface, object_path, message, type);
+
+    while (g_object_get_data(G_OBJECT(prompt_interface), "handled") != GINT_TO_POINTER(1))
+    {
+        g_main_context_iteration(NULL, TRUE);
+    }
+
+    g_object_set_data(G_OBJECT(prompt_interface), "handled", NULL);
+
+    ReportDaemon::inst().unregister_object(G_DBUS_OBJECT(prompt_skeleton));
+
+    return prompt_interface;
+}
+
+static char *
+report_task_ask_callback (const char *msg,
+                          void       *interaction_param)
+{
+    ReportTask *self;
+    g_autoptr(ReportDbusTaskPrompt) prompt_interface = NULL;
+    const char *input;
+
+    self = REPORT_TASK(interaction_param);
+    prompt_interface = report_task_emit_prompt(self, msg, ASK);
+    input = report_dbus_task_prompt_get_input(prompt_interface);
+
+    return g_strdup(input);
+}
+
+static int
+report_task_ask_yes_no_callback(const char *msg,
+                                void       *interaction_param)
+{
+    ReportTask *self;
+    g_autoptr(ReportDbusTaskPrompt) prompt_interface = NULL;
+
+    self = REPORT_TASK(interaction_param);
+    prompt_interface = report_task_emit_prompt(self, msg, ASK_YES_NO);
+
+    return report_dbus_task_prompt_get_response(prompt_interface);
+}
+
+static int
+report_task_ask_yes_no_yesforever_callback(const char *key,
+                                           const char *msg,
+                                           void       *interaction_param)
+{
+    const char *value;
+    ReportTask *self;
+    g_autoptr(ReportDbusTaskPrompt) prompt_interface = NULL;
+    bool response;
+    bool remember;
+
+    value = get_user_setting(key);
+    /* The following is replicating the madness inside libreport, where
+     * “no” means “yes, forever”, and “yes” means nothing, really.
+     *
+     * Yes (no?), each implementation has a similar comment.
+     */
+    if (value != NULL && !string_to_bool(value))
+    {
+        return TRUE;
+    }
+    self = REPORT_TASK(interaction_param);
+    prompt_interface = report_task_emit_prompt(self, msg, ASK_YES_NO_YESFOREVER);
+    response = report_dbus_task_prompt_get_response(prompt_interface);
+    remember = report_dbus_task_prompt_get_remember(prompt_interface);
+    if (remember && !response)
+    {
+        set_user_setting(key, "no");
+    }
+
+    return response;
+}
+
+static int
+report_task_ask_yes_no_save_result_callback(const char *key,
+                                            const char *msg,
+                                            void       *interaction_param)
+{
+    const char *value;
+    ReportTask *self;
+    g_autoptr(ReportDbusTaskPrompt) prompt_interface = NULL;
+    bool response;
+    bool remember;
+
+    value = get_user_setting(key);
+    if (value != NULL)
+    {
+        return string_to_bool(value);
+    }
+    self = REPORT_TASK(interaction_param);
+    prompt_interface = report_task_emit_prompt(self, msg, ASK_YES_NO_SAVE);
+    response = report_dbus_task_prompt_get_response(prompt_interface);
+    remember = report_dbus_task_prompt_get_remember(prompt_interface);
+    if (remember)
+    {
+        value = response? "yes" : "no";
+
+        set_user_setting(key, value);
+    }
+
+    return response;
+}
+
+static char *
+report_task_ask_password_callback(const char *msg,
+                                  void       *interaction_param)
+{
+    ReportTask *self;
+    g_autoptr(ReportDbusTaskPrompt) prompt_interface = NULL;
+    const char *password;
+
+    self = REPORT_TASK(interaction_param);
+    prompt_interface = report_task_emit_prompt(self, msg, ASK_PASSWORD);
+    password = report_dbus_task_prompt_get_input(prompt_interface);
+
+    return g_strdup(password);
+}
+
+static gboolean
+report_task_handle_start(ReportDbusTask        *object,
                          GDBusMethodInvocation *invocation,
                          ReportTask            *self)
 {
@@ -103,6 +267,12 @@ report_task_handle_start(ReportDbusTask        * /*object*/,
     struct run_event_state *run_state = new_run_event_state();
     run_state->logging_callback = do_log2;
     run_state->logging_param = self;
+    run_state->interaction_param = self;
+    run_state->ask_callback = report_task_ask_callback;
+    run_state->ask_yes_no_callback = report_task_ask_yes_no_callback;
+    run_state->ask_yes_no_yesforever_callback = report_task_ask_yes_no_yesforever_callback;
+    run_state->ask_yes_no_save_result_callback = report_task_ask_yes_no_save_result_callback;
+    run_state->ask_password_callback = report_task_ask_password_callback;
 
     run_event_chain(run_state, problem_dir.c_str(), event_names);
 

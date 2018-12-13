@@ -19,5 +19,6 @@
 #define REPORTD_DBUS_OBJECT_MANAGER_PATH     "/org/freedesktop/reportd"
 #define REPORTD_DBUS_SERVICE_PATH            "/org/freedesktop/reportd/Service"
 #define REPORTD_DBUS_TASK_PATH               "/org/freedesktop/reportd/Task"
+#define REPORTD_DBUS_TASK_PROMPT_PATH        REPORTD_DBUS_TASK_PATH "/Prompt"
 
 #endif/*__REPORT_DBUS_CONSTANTS__*/

@@ -31,6 +31,8 @@
 #include <sstream>
 #include <err.h>
 
+#include <internal_libreport.h>
+
 using namespace Glib;
 
 static RefPtr<MainLoop> s_main_loop;
@@ -292,6 +294,16 @@ ReportDaemon::register_object(GDBusObjectSkeleton *object)
     g_dbus_object_manager_server_export_uniquely(d->object_manager, object);
 }
 
+void
+ReportDaemon::unregister_object(GDBusObject *object)
+{
+    const char *object_path;
+
+    object_path = g_dbus_object_get_object_path(object);
+
+    g_dbus_object_manager_server_unexport(d->object_manager, object_path);
+}
+
 static void
 on_bus_acquired(const Glib::RefPtr<Gio::DBus::Connection>&,
                 const Glib::ustring                      & name)
@@ -365,7 +377,11 @@ main(int argc, char *argv[])
     g_unix_signal_add(SIGINT,  on_signal_quit, NULL);
     g_unix_signal_add(SIGTERM, on_signal_quit, NULL);
 
+    load_user_settings("reportd");
+
     s_main_loop->run();
+
+    save_user_settings();
 
     if (bus_name_id > 0) {
         Gio::DBus::unown_name(bus_name_id);
