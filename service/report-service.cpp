@@ -133,6 +133,8 @@ report_service_handle_create_task(ReportDbusService     * /*object*/,
     GVariant *retval = g_variant_new("(o)", object_path);
     g_dbus_method_invocation_return_value(invocation, retval);
 
+    g_object_unref(t);
+
     return TRUE;
 }
 
