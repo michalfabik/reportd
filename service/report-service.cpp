@@ -152,6 +152,7 @@ report_service_handle_get_workflows(ReportDbusService * /*object*/,
         g_dbus_method_invocation_return_error(invocation,
                                               err.domain(),
                                               err.code(),
+                                              "%s",
                                               err.what().c_str());
         return TRUE;
     }
