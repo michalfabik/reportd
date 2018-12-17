@@ -45,8 +45,8 @@ PKG_CHECK_MODULES([LIBREPORT], [libreport])
 DBUS_SERVICES_DIR="${datadir}/dbus-1/services"
 AC_SUBST(DBUS_SERVICES_DIR)
 
-CFLAGS="$CFLAGS -Wall -Wextra -Werror -std=c11"
-CXXFLAGS="$CXXFLAGS -Wall -Wextra -Werror -std=c++14"
+CFLAGS="$CFLAGS -Wall -Wextra -std=c11"
+CXXFLAGS="$CXXFLAGS -Wall -Wextra -std=c++14"
 
 AC_CONFIG_FILES([
         Makefile
