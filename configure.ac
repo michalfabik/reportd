@@ -1,4 +1,4 @@
-AC_INIT([reportd], [0.1], [crash-catcher@fedorahosted.org], [reportd])
+AC_INIT([reportd], [0.2], [crash-catcher@fedorahosted.org], [reportd])
 
 INTLTOOL_REQ=0.35.0
 

@@ -1,2 +1,6 @@
+0.2
+ * Drop uses of g_type_class_add_private()
+ * Fix compiler warnings
+
 0.1
  * Initial release
