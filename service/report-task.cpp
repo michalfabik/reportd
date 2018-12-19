@@ -16,26 +16,30 @@
 
 #include "report-task.h"
 #include "report-daemon.h"
+#include "report-dbus-generated.h"
 
 #include <workflow.h>
 #include <client.h>
 #include <run_event.h>
 
-G_DEFINE_TYPE(ReportTask, report_task, G_TYPE_DBUS_OBJECT_SKELETON);
-
-struct _ReportTaskPrivate
+struct _ReportTask
 {
+    GDBusObjectSkeleton parent;
+
     ReportDbusTask   *task_iface;
     gchar            *problem_path;
     workflow_t       *workflow;
 };
+
+G_DEFINE_TYPE(ReportTask, report_task, G_TYPE_DBUS_OBJECT_SKELETON)
+
 /*** Event running ***/
 
 static char *
 do_log2(char *log_line, void *param)
 {
     ReportTask *self = REPORT_TASK(param);
-    report_dbus_task_emit_progress(self->pv->task_iface, log_line);
+    report_dbus_task_emit_progress(self->task_iface, log_line);
     return log_line;
 }
 
@@ -91,12 +95,12 @@ report_task_handle_start(ReportDbusTask        * /*object*/,
                          GDBusMethodInvocation *invocation,
                          ReportTask            *self)
 {
-    GList *event_names = wf_get_event_names(self->pv->workflow);
+    GList *event_names = wf_get_event_names(self->workflow);
 
-    report_dbus_task_set_status(self->pv->task_iface, "RUNNING");
-    g_debug("Started task: %s", self->pv->problem_path);
+    report_dbus_task_set_status(self->task_iface, "RUNNING");
+    g_debug("Started task: %s", self->problem_path);
 
-    std::string problem_dir{ReportDaemon::inst().get_problem_directory(self->pv->problem_path)};
+    std::string problem_dir{ReportDaemon::inst().get_problem_directory(self->problem_path)};
 
     struct run_event_state *run_state = new_run_event_state();
     run_state->logging_callback = do_log2;
@@ -109,8 +113,8 @@ report_task_handle_start(ReportDbusTask        * /*object*/,
     g_list_free_full(event_names, free);
 
     ReportDaemon::inst().push_problem_directory(problem_dir);
-    report_dbus_task_set_status(self->pv->task_iface, "FINISHED");
-    g_debug("Finished task: %s", self->pv->problem_path);
+    report_dbus_task_set_status(self->task_iface, "FINISHED");
+    g_debug("Finished task: %s", self->problem_path);
 
     g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
     return TRUE;
@@ -121,7 +125,7 @@ report_task_handle_cancel(ReportDbusTask        * /*object*/,
                           GDBusMethodInvocation *invocation,
                           ReportTask            *self)
 {
-    g_debug("Canceled task: %s", self->pv->problem_path);
+    g_debug("Canceled task: %s", self->problem_path);
     g_dbus_method_invocation_return_value(invocation, g_variant_new("()"));
     return TRUE;
 }
@@ -129,18 +133,16 @@ report_task_handle_cancel(ReportDbusTask        * /*object*/,
 static void
 report_task_init(ReportTask *self)
 {
-    self->pv = G_TYPE_INSTANCE_GET_PRIVATE(self, REPORT_TYPE_TASK, ReportTaskPrivate);
+    self->task_iface = report_dbus_task_skeleton_new();
 
-    self->pv->task_iface = report_dbus_task_skeleton_new();
-
-    g_signal_connect(self->pv->task_iface, "handle-start",
+    g_signal_connect(self->task_iface, "handle-start",
                      G_CALLBACK (report_task_handle_start), self);
 
-    g_signal_connect(self->pv->task_iface, "handle-cancel",
+    g_signal_connect(self->task_iface, "handle-cancel",
                      G_CALLBACK (report_task_handle_cancel), self);
 
     g_dbus_object_skeleton_add_interface(G_DBUS_OBJECT_SKELETON(self),
-                                         G_DBUS_INTERFACE_SKELETON(self->pv->task_iface));
+                                         G_DBUS_INTERFACE_SKELETON(self->task_iface));
 }
 
 static void
@@ -151,7 +153,7 @@ report_task_constructed(GObject *obj)
     G_OBJECT_CLASS(report_task_parent_class)->constructed(obj);
 
     /* The dbus version property of the task */
-    report_dbus_task_set_status(self->pv->task_iface, "NEW");
+    report_dbus_task_set_status(self->task_iface, "NEW");
 }
 
 static void
@@ -159,7 +161,7 @@ report_task_dispose(GObject *obj)
 {
     ReportTask *self = REPORT_TASK(obj);
 
-    g_free(self->pv->problem_path);
+    g_free(self->problem_path);
 
     G_OBJECT_CLASS(report_task_parent_class)->finalize(obj);
 }
@@ -171,8 +173,6 @@ report_task_class_init(ReportTaskClass *klass)
 
     object_class->constructed = report_task_constructed;
     object_class->dispose     = report_task_dispose;
-
-    g_type_class_add_private (klass, sizeof (ReportTaskPrivate));
 }
 
 ReportTask *report_task_new(const gchar      *object_path,
@@ -184,8 +184,8 @@ ReportTask *report_task_new(const gchar      *object_path,
                                    NULL);
 
     ReportTask *task = static_cast<ReportTask *>(object);
-    task->pv->problem_path = g_strdup(problem_path);
-    task->pv->workflow  = workflow;
+    task->problem_path = g_strdup(problem_path);
+    task->workflow  = workflow;
 
     return task;
 }

@@ -17,6 +17,7 @@
 #include "report-task.h"
 #include "report-daemon.h"
 #include "report-dbus-constants.h"
+#include "report-dbus-generated.h"
 
 #include <iostream>
 #include <cstring>
@@ -25,19 +26,21 @@
 #include <run_event.h>
 #include <workflow.h>
 
-G_DEFINE_TYPE(ReportService, report_service, G_TYPE_DBUS_OBJECT_SKELETON);
+struct _ReportService {
+    GDBusObjectSkeleton parent;
 
-struct _ReportServicePrivate {
     ReportDbusService *service_iface;
     GHashTable        *workflows;
     unsigned long      task_cnt;
     Glib::RefPtr<Gio::DBus::Proxy> problems_session;
 };
 
+G_DEFINE_TYPE(ReportService, report_service, G_TYPE_DBUS_OBJECT_SKELETON)
+
 static Glib::RefPtr<Gio::DBus::Proxy>
-get_problems_session(ReportServicePrivate *pv)
+get_problems_session(ReportService *self)
 {
-    if (!pv->problems_session) {
+    if (!self->problems_session) {
         auto cancellable = Gio::Cancellable::create();
         auto connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::BUS_TYPE_SYSTEM,
                                                           cancellable);
@@ -71,27 +74,27 @@ get_problems_session(ReportServicePrivate *pv)
             return {};
         }
 
-        pv->problems_session = Gio::DBus::Proxy::create_sync(connection,
-                                                             "org.freedesktop.problems",
-                                                             session_path,
-                                                             "org.freedesktop.Problems2.Session",
-                                                             cancellable,
+        self->problems_session = Gio::DBus::Proxy::create_sync(connection,
+                                                               "org.freedesktop.problems",
+                                                               session_path,
+                                                               "org.freedesktop.Problems2.Session",
+                                                               cancellable,
                                                              info,
                                                              Gio::DBus::PROXY_FLAGS_NONE);
-        if (!pv->problems_session) {
+        if (!self->problems_session) {
             throw Gio::DBus::Error(Gio::DBus::Error::FAILED,
                                    "Own Problems2 Session not accessible");
         }
     }
 
-    return pv->problems_session;
+    return self->problems_session;
 }
 
 static workflow_t *
 report_service_find_workflow_by_name(ReportService *self,
                                      const char    *wf_name)
 {
-    return (workflow_t *)g_hash_table_lookup(self->pv->workflows, (gpointer)wf_name);
+    return (workflow_t *)g_hash_table_lookup(self->workflows, (gpointer)wf_name);
 }
 
 static gboolean
@@ -101,7 +104,7 @@ report_service_handle_create_task(ReportDbusService     * /*object*/,
                                   const gchar           *arg_problem,
                                   ReportService         *self)
 {
-    if (self->pv->task_cnt == ULONG_MAX) {
+    if (self->task_cnt == ULONG_MAX) {
         g_dbus_method_invocation_return_error(invocation,
                 G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
                 "Reportd Service cannot create a new task");
@@ -119,7 +122,7 @@ report_service_handle_create_task(ReportDbusService     * /*object*/,
 
     g_debug("Creating task for problem '%s'", arg_problem);
 
-    unsigned long task_id = self->pv->task_cnt++;
+    unsigned long task_id = self->task_cnt++;
     std::string task_path{std::string{REPORTD_DBUS_TASK_BASE_PATH} + std::to_string(task_id)};
 
     ReportTask *t = report_task_new(task_path.c_str(),
@@ -149,6 +152,7 @@ report_service_handle_get_workflows(ReportDbusService * /*object*/,
         g_dbus_method_invocation_return_error(invocation,
                                               err.domain(),
                                               err.code(),
+                                              "%s",
                                               err.what().c_str());
         return TRUE;
     }
@@ -251,7 +255,7 @@ report_service_handle_authorize_problems_session(ReportDbusService     * /*objec
 {
     g_debug("Authorizing reportd's Problems2 Session");
 
-    auto session = get_problems_session(self->pv);
+    auto session = get_problems_session(self);
 
     auto p = ReportServicePendingAuthorization{invocation};
     auto connection = session->signal_signal().connect(p);
@@ -311,29 +315,27 @@ report_service_handle_authorize_problems_session(ReportDbusService     * /*objec
 static void
 report_service_init(ReportService *self)
 {
-    self->pv = G_TYPE_INSTANCE_GET_PRIVATE(self, REPORT_TYPE_SERVICE, ReportServicePrivate);
+    self->service_iface = report_dbus_service_skeleton_new();
+    self->task_cnt = 1;
+    self->workflows = load_workflow_config_data(/*the default location*/NULL);
 
-    self->pv->service_iface = report_dbus_service_skeleton_new();
-    self->pv->task_cnt = 1;
-    self->pv->workflows = load_workflow_config_data(/*the default location*/NULL);
-
-    g_signal_connect(self->pv->service_iface,
+    g_signal_connect(self->service_iface,
                      "handle-create-task",
                      G_CALLBACK(report_service_handle_create_task),
                      self);
 
-    g_signal_connect(self->pv->service_iface,
+    g_signal_connect(self->service_iface,
                      "handle-get-workflows",
                      G_CALLBACK(report_service_handle_get_workflows),
                      self);
 
-    g_signal_connect(self->pv->service_iface,
+    g_signal_connect(self->service_iface,
                      "handle-authorize-problems-session",
                      G_CALLBACK(report_service_handle_authorize_problems_session),
                      self);
 
     g_dbus_object_skeleton_add_interface(G_DBUS_OBJECT_SKELETON(self),
-                                         G_DBUS_INTERFACE_SKELETON(self->pv->service_iface));
+                                         G_DBUS_INTERFACE_SKELETON(self->service_iface));
 }
 
 static void
@@ -348,8 +350,6 @@ report_service_class_init(ReportServiceClass *klass)
     GObjectClass *object_class = G_OBJECT_CLASS (klass);
 
     object_class->constructed = report_service_constructed;
-
-    g_type_class_add_private(klass, sizeof (ReportServicePrivate));
 }
 
 ReportService *report_service_new(const gchar *object_path)
