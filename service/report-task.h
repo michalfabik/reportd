@@ -12,8 +12,6 @@
  * Author: Jakub Filak <jfilak@redhat.com>
  */
 
-#include "config.h"
-
 #ifndef __REPORT_TASK_H__
 #define __REPORT_TASK_H__
 

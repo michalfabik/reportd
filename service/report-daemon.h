@@ -12,8 +12,6 @@
  * Author: Jakub Filak <jfilak@redhat.com>
  */
 
-#include "config.h"
-
 #ifndef __REPORT_DAEMON_H__
 #define __REPORT_DAEMON_H__
 
@@ -25,6 +23,7 @@ class ReportDaemon {
         void        push_problem_directory (const std::string &);
 
         void        register_object       (GDBusObjectSkeleton *);
+        void        unregister_object     (GDBusObject *);
 
 
         static ReportDaemon& inst();
