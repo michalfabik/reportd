@@ -17,4 +17,5 @@ reportd_dependencies = [
 executable('reportd', reportd_sources,
   dependencies: reportd_dependencies,
   install: true,
+  install_dir: get_option('libexecdir'),
 )
