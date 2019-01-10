@@ -5,7 +5,7 @@ project('reportd', 'c', 'cpp',
 
 giomm = dependency('giomm-2.4')
 gio_unix = dependency('gio-unix-2.0')
-libreport = dependency('libreport')
+libreport = dependency('libreport', version: '>= 2.10.0')
 
 gnome = import('gnome')
 
