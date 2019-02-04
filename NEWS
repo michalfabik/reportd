@@ -1,3 +1,16 @@
+0.5
+ * Export used workflow when reporting
+
+0.4.1
+ * Use correct installation directory for daemon executable
+
+0.4
+ * Remove Autotools support
+
+0.3
+ * Add support for Meson
+ * Add D-Bus interface for clients to handle input prompts when reporting
+
 0.2.1
  * Require Automake 1.14, replace deprecated macros
 

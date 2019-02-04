@@ -1,6 +1,6 @@
 project('reportd', 'c', 'cpp',
   license: 'GPL2+',
-  version: '0.2',
+  version: '0.5',
 )
 
 giomm = dependency('giomm-2.4')
