@@ -258,6 +258,7 @@ report_task_handle_start(ReportDbusTask        *object,
                          ReportTask            *self)
 {
     GList *event_names = wf_get_event_names(self->workflow);
+    char *workflow;
 
     report_dbus_task_set_status(self->task_iface, "RUNNING");
     g_debug("Started task: %s", self->problem_path);
@@ -273,6 +274,10 @@ report_task_handle_start(ReportDbusTask        *object,
     run_state->ask_yes_no_yesforever_callback = report_task_ask_yes_no_yesforever_callback;
     run_state->ask_yes_no_save_result_callback = report_task_ask_yes_no_save_result_callback;
     run_state->ask_password_callback = report_task_ask_password_callback;
+
+    workflow = g_strdup_printf("LIBREPORT_WORKFLOW=%s", wf_get_name(self->workflow));
+
+    g_ptr_array_add(run_state->extra_environment, workflow);
 
     run_event_chain(run_state, problem_dir.c_str(), event_names);
 
