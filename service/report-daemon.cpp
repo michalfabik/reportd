@@ -331,29 +331,6 @@ main(int argc, char *argv[])
 {
     Gio::init();
 
-    {
-        bool verbose = false;
-        Glib::OptionEntry opt_v;
-        opt_v.set_short_name('v');
-        opt_v.set_long_name("verbose");
-        opt_v.set_description("Produce debugging output");
-
-        Glib::OptionGroup options{"OPTIONS", "Program options"};
-        options.add_entry(opt_v, verbose);
-
-        Glib::OptionContext context;
-        context.set_help_enabled();
-        context.set_main_group(options);
-
-        if (!context.parse(argc, argv)) {
-            errx(EXIT_FAILURE, "Invalid command line arguments");
-        }
-
-        if (verbose) {
-            Glib::setenv("G_MESSAGES_DEBUG", "all");
-        }
-    }
-
     { /* Test availability of Session bus */
         try {
             auto connection = Gio::DBus::Connection::get_sync(Gio::DBus::BusType::BUS_TYPE_SESSION);
