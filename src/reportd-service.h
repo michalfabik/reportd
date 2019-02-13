@@ -12,20 +12,15 @@
  * Author: Jakub Filak <jfilak@redhat.com>
  */
 
-#ifndef __REPORT_SERVICE_H__
-#define __REPORT_SERVICE_H__
+#pragma once
+
+#include "reportd-types.h"
 
 #include <gio/gio.h>
 
-G_BEGIN_DECLS
-
-#define REPORT_TYPE_SERVICE report_service_get_type()
-
-G_DECLARE_FINAL_TYPE(ReportService, report_service, REPORT, SERVICE,
+#define REPORTD_TYPE_SERVICE reportd_service_get_type ()
+G_DECLARE_FINAL_TYPE(ReportdService, reportd_service, REPORTD, SERVICE,
                      GDBusObjectSkeleton)
 
-ReportService *report_service_new(const gchar *object_path);
-
-G_END_DECLS
-
-#endif /*__REPORT_SERVICE_H__*/
+ReportdService *reportd_service_new (ReportdDaemon *daemon,
+                                     const char    *object_path);

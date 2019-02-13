@@ -12,21 +12,23 @@
  * Author: Jakub Filak <jfilak@redhat.com>
  */
 
-#ifndef __REPORT_TASK_H__
-#define __REPORT_TASK_H__
+#pragma once
+
+#include "reportd-types.h"
 
 #include <gio/gio.h>
 
+#include <workflow.h>
+
 G_BEGIN_DECLS
 
-#define REPORT_TYPE_TASK report_task_get_type ()
+#define REPORTD_TYPE_TASK reportd_task_get_type ()
 
-G_DECLARE_FINAL_TYPE(ReportTask, report_task, REPORT, TASK, GDBusObjectSkeleton)
+G_DECLARE_FINAL_TYPE (ReportdTask, reportd_task, REPORTD, TASK, GDBusObjectSkeleton)
 
-ReportTask *report_task_new(const gchar     *object_path,
-                            const gchar     *problem_path,
-                            struct workflow *workflow);
+ReportdTask *reportd_task_new (ReportdDaemon   *daemon,
+                               const char      *object_path,
+                               const char      *problem_path,
+                               struct workflow *workflow);
 
 G_END_DECLS
-
-#endif /*__REPORT_TASK_H__*/

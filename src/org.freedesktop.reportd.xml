@@ -3,7 +3,7 @@
 <node name="/">
 
     <!--
-      org.freedesktop.reortd.Service:
+      org.freedesktop.reportd.Service:
       @short_description: the reportd service
 
       The object is a singleton and sits on bus name
