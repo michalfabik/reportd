@@ -27,6 +27,7 @@ struct _ReportdService
     ReportdDbusService *service_iface;
     GHashTable *workflows;
     GDBusProxy *session_proxy;
+    GHashTable *tasks;
 };
 
 G_DEFINE_TYPE(ReportdService, reportd_service, G_TYPE_DBUS_OBJECT_SKELETON)
@@ -90,6 +91,50 @@ reportd_service_get_session_proxy (ReportdService  *self,
     return self->session_proxy;
 }
 
+static void
+reportd_service_unexport_task (gpointer data,
+                               gpointer user_data)
+{
+    ReportdTask *task;
+    ReportdDaemon *daemon;
+
+    task = REPORTD_TASK (data);
+    daemon = REPORTD_DAEMON (user_data);
+
+    reportd_daemon_unregister_object (daemon, G_DBUS_OBJECT (task));
+}
+
+typedef struct
+{
+    ReportdService *service;
+    unsigned int bus_name_watcher_id;
+} ReportdServiceBusNameWatcherData;
+
+static void
+reportd_service_on_name_vanished (GDBusConnection *connection,
+                                  const char      *name,
+                                  gpointer         user_data)
+{
+    ReportdServiceBusNameWatcherData *data;
+    GPtrArray *task_array;
+
+    data = user_data;
+    task_array = g_hash_table_lookup (data->service->tasks, name);
+
+    if (NULL != task_array)
+    {
+        g_ptr_array_foreach (task_array, reportd_service_unexport_task,
+                             data->service->daemon);
+    }
+
+    g_hash_table_remove (data->service->tasks, name);
+
+    g_clear_handle_id (&data->bus_name_watcher_id, g_bus_unwatch_name);
+    g_clear_object (&data->service);
+
+    g_free (data);
+}
+
 static bool
 reportd_service_handle_create_task (ReportdDbusService    *object,
                                     GDBusMethodInvocation *invocation,
@@ -102,6 +147,10 @@ reportd_service_handle_create_task (ReportdDbusService    *object,
     g_autoptr (ReportdTask) task = NULL;
     const char *object_path;
     GVariant *variant;
+    g_autoptr (GDBusConnection) connection;
+    const char *sender;
+    ReportdServiceBusNameWatcherData *data;
+    GPtrArray *task_array;
 
     self = REPORTD_SERVICE (user_data);
     workflow = g_hash_table_lookup (self->workflows, arg_workflow);
@@ -119,6 +168,27 @@ reportd_service_handle_create_task (ReportdDbusService    *object,
     task = reportd_task_new (self->daemon, REPORTD_DBUS_TASK_PATH, arg_problem, workflow);
     object_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (task));
     variant = g_variant_new ("(o)", object_path);
+    connection = g_dbus_method_invocation_get_connection (invocation);
+    sender = g_dbus_method_invocation_get_sender (invocation);
+    data = g_new0 (ReportdServiceBusNameWatcherData, 1);
+
+    data->service = g_object_ref (self);
+    data->bus_name_watcher_id = g_bus_watch_name_on_connection (connection,
+                                                                sender,
+                                                                G_BUS_NAME_WATCHER_FLAGS_NONE,
+                                                                NULL,
+                                                                reportd_service_on_name_vanished,
+                                                                data, NULL);
+
+    task_array = g_hash_table_lookup (self->tasks, sender);
+    if (NULL == task_array)
+    {
+        task_array = g_ptr_array_new ();
+
+        g_hash_table_insert (self->tasks, g_strdup (sender), task_array);
+    }
+
+    g_ptr_array_add (task_array, task);
 
     g_dbus_method_invocation_return_value (invocation, variant);
 
@@ -315,6 +385,8 @@ reportd_service_init (ReportdService *self)
 {
     self->service_iface = reportd_dbus_service_skeleton_new ();
     self->workflows = load_workflow_config_data (NULL);
+    self->tasks = g_hash_table_new_full (g_str_hash, g_str_equal,
+                                         g_free, (GDestroyNotify) g_ptr_array_unref);
 
     g_signal_connect (self->service_iface,
                       "handle-create-task",
