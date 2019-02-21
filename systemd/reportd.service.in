@@ -1,0 +1,10 @@
+[Unit]
+Description=ABRT Report Daemon
+
+[Service]
+Type=dbus
+BusName=org.freedesktop.reportd
+ExecStart=@libexecdir@/reportd @options@
+
+[Install]
+WantedBy=default.target

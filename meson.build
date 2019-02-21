@@ -44,3 +44,4 @@ gnome = import('gnome')
 
 subdir('dbus')
 subdir('src')
+subdir('systemd')
