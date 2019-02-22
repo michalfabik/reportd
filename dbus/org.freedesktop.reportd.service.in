@@ -1,4 +1,4 @@
 [D-BUS Service]
 Name=org.freedesktop.reportd
-Exec=@libexecdir@/reportd
+Exec=@libexecdir@/reportd @options@
 SystemdService=reportd.service
