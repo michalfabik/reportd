@@ -1,3 +1,9 @@
+0.6
+ * Rewrite C++ parts in C
+ * Fix task object leak
+ * Add systemd service units
+ * Add system D-Bus service
+
 0.5
  * Export used workflow when reporting
 
