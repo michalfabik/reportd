@@ -216,7 +216,7 @@ reportd_service_handle_get_workflows (ReportdDbusService    *object,
     {
         g_dbus_method_invocation_return_gerror (invocation, error);
 
-        return TRUE;
+        return true;
     }
 
     g_debug ("Getting workflows for problem directory “%s”", problem_directory);
