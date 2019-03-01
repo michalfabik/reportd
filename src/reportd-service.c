@@ -147,7 +147,7 @@ reportd_service_handle_create_task (ReportdDbusService    *object,
     g_autoptr (ReportdTask) task = NULL;
     const char *object_path;
     GVariant *variant;
-    g_autoptr (GDBusConnection) connection;
+    g_autoptr (GDBusConnection) connection = NULL;
     const char *sender;
     ReportdServiceBusNameWatcherData *data;
     GPtrArray *task_array;
