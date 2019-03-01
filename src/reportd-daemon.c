@@ -236,7 +236,8 @@ reportd_daemon_get_problem_directory (ReportdDaemon  *self,
     g_autofree char *canonical_entry = NULL;
     g_autofree char *base_name = NULL;
     g_autofree char *cache_problem_directory_path = NULL;
-    g_autoptr (GDBusProxy) entry_proxy = NULL;
+    g_autoptr (GVariant) tuple = NULL;
+    g_autoptr (GVariant) variant = NULL;
     g_autoptr (GVariant) elements_variant = NULL;
     size_t element_count;
     g_autofree const char **elements = NULL;
@@ -258,37 +259,31 @@ reportd_daemon_get_problem_directory (ReportdDaemon  *self,
 
     g_debug ("Pulling entry “%s”", entry);
 
-    entry_proxy = g_dbus_proxy_new_sync (self->system_bus_connection,
-                                         G_DBUS_PROXY_FLAGS_NONE,
-                                         NULL,
+    tuple = g_dbus_connection_call_sync (self->system_bus_connection,
                                          "org.freedesktop.problems",
                                          entry,
-                                         "org.freedesktop.Problems2.Entry",
-                                         NULL, error);
-    if (NULL == entry_proxy)
+                                         "org.freedesktop.DBus.Properties",
+                                         "Get",
+                                         g_variant_new ("(ss)",
+                                                        "org.freedesktop.Problems2.Entry",
+                                                        "Elements"),
+                                         G_VARIANT_TYPE ("(v)"),
+                                         G_DBUS_CALL_FLAGS_NONE,
+                                         -1,
+                                         NULL,
+                                         error);
+    if (NULL == tuple)
     {
         return NULL;
     }
-    elements_variant = g_dbus_proxy_get_cached_property (entry_proxy, "Elements");
-    if (NULL == elements_variant)
-    {
-        g_set_error (error, G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
-                     "D-Bus proxy for entry “%s” has no cached property named “Elements”",
-                     entry);
-
-        return NULL;
-    }
+    variant = g_variant_get_child_value (tuple, 0);
+    elements_variant = g_variant_get_variant (variant);
     elements = g_variant_get_strv (elements_variant, &element_count);
     dump_directory = dd_create_skeleton (cache_problem_directory_path, -1, 0600, 0);
 
     for (size_t i = 0; i < element_count; i += DBUS_FD_LIMIT)
     {
-        GVariant *children[] =
-        {
-            g_variant_new_strv (elements + i, MIN (DBUS_FD_LIMIT, element_count - i)),
-            g_variant_new_int32 (1),
-        };
-        GVariant *tuple;
+        GVariant *strv;
         g_autoptr (GUnixFDList) out_fd_list = NULL;
         g_autoptr (GVariant) return_value_tuple = NULL;
         g_autoptr (GVariant) return_value = NULL;
@@ -296,16 +291,21 @@ reportd_daemon_get_problem_directory (ReportdDaemon  *self,
         char *key;
         GVariant *value;
 
-        tuple = g_variant_new_tuple (children, G_N_ELEMENTS (children));
+        strv = g_variant_new_strv (elements + i, MIN (DBUS_FD_LIMIT, element_count - i));
         out_fd_list = g_unix_fd_list_new ();
-        return_value_tuple = g_dbus_proxy_call_with_unix_fd_list_sync (entry_proxy,
-                                                                       "ReadElements",
-                                                                       tuple,
-                                                                       G_DBUS_CALL_FLAGS_NONE,
-                                                                       -1,
-                                                                       NULL, &out_fd_list,
-                                                                       NULL,
-                                                                       error);
+        return_value_tuple =
+            g_dbus_connection_call_with_unix_fd_list_sync (self->system_bus_connection,
+                                                           "org.freedesktop.problems",
+                                                           entry,
+                                                           "org.freedesktop.Problems2.Entry",
+                                                           "ReadElements",
+                                                           g_variant_new_parsed ("(%as, 1)", strv),
+                                                           G_VARIANT_TYPE ("(a{sv})"),
+                                                           G_DBUS_CALL_FLAGS_NONE,
+                                                           -1,
+                                                           NULL, &out_fd_list,
+                                                           NULL,
+                                                           error);
         if (NULL == return_value_tuple)
         {
             return NULL;
