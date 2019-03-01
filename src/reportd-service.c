@@ -206,7 +206,6 @@ reportd_service_handle_get_workflows (ReportdDbusService    *object,
     g_autofree char *problem_directory = NULL;
     g_autoptr (GList) workflows = NULL;
     g_autoptr (GVariantBuilder) builder = NULL;
-    GVariant *tuple;
 
     self = REPORTD_SERVICE (user_data);
     problem_directory = reportd_daemon_get_problem_directory (self->daemon,
@@ -249,9 +248,8 @@ reportd_service_handle_get_workflows (ReportdDbusService    *object,
 
     g_variant_builder_close (builder);
 
-    tuple = g_variant_builder_end (builder);
-
-    g_dbus_method_invocation_return_value (invocation, tuple);
+    g_dbus_method_invocation_return_value (invocation,
+                                           g_variant_builder_end (builder));
 
     return true;
 }
