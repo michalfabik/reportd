@@ -324,7 +324,8 @@ reportd_service_handle_authorize_problems_session (ReportdDbusService    *object
                       invocation);
 
     tuple = g_dbus_proxy_call_sync (session_proxy,
-                                    "Authorize", NULL,
+                                    "Authorize",
+                                    g_variant_new ("(a{sv})", NULL),
                                     G_DBUS_CALL_FLAGS_NONE, -1, NULL,
                                     &error);
     if (NULL == tuple)
