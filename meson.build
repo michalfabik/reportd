@@ -1,6 +1,6 @@
 project('reportd', 'c',
   license: 'GPL2+',
-  version: '0.6',
+  version: '0.6.1',
 )
 
 cc = meson.get_compiler('c')

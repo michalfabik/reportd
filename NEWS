@@ -1,3 +1,6 @@
+0.6.1
+ * Work around GLib not caching property values in some cases
+
 0.6
  * Rewrite C++ parts in C
  * Fix task object leak
