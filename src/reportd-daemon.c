@@ -227,6 +227,75 @@ reportd_daemon_connect_to_bus (ReportdDaemon  *self,
     return true;
 }
 
+static bool
+reportd_daemon_populate_dump_directory (ReportdDaemon    *self,
+                                        const char       *entry,
+                                        struct dump_dir  *dump_directory,
+                                        const char      **elements,
+                                        size_t            element_count,
+                                        GError          **error)
+{
+    for (size_t i = 0; i < element_count; i += DBUS_FD_LIMIT)
+    {
+        GVariant *strv;
+        g_autoptr (GVariantBuilder) builder = NULL;
+        g_autoptr (GUnixFDList) out_fd_list = NULL;
+        g_autoptr (GVariant) tuple = NULL;
+        g_autoptr (GVariant) dictionary = NULL;
+        GVariantIter iter;
+        char *key;
+        GVariant *value;
+
+        strv = g_variant_new_strv (elements + i, MIN (DBUS_FD_LIMIT, element_count - i));
+        builder = g_variant_builder_new (G_VARIANT_TYPE_TUPLE);
+
+        g_variant_builder_add_value (builder, strv);
+        g_variant_builder_add_parsed (builder, "1");
+
+        tuple = g_dbus_connection_call_with_unix_fd_list_sync (self->system_bus_connection,
+                                                               "org.freedesktop.problems",
+                                                               entry,
+                                                               "org.freedesktop.Problems2.Entry",
+                                                               "ReadElements",
+                                                               g_variant_builder_end (builder),
+                                                               G_VARIANT_TYPE ("(a{sv})"),
+                                                               G_DBUS_CALL_FLAGS_NONE,
+                                                               -1,
+                                                               NULL, &out_fd_list,
+                                                               NULL,
+                                                               error);
+        if (NULL == tuple)
+        {
+            return false;
+        }
+        dictionary = g_variant_get_child_value (tuple, 0);
+
+        g_variant_iter_init (&iter, dictionary);
+
+        while (g_variant_iter_loop (&iter, "{sv}", &key, &value))
+        {
+            int index;
+            int fd;
+
+            index = g_variant_get_handle (value);
+            fd = g_unix_fd_list_get (out_fd_list, index, error);
+            if (-1 == fd)
+            {
+                close (fd);
+                dd_close (dump_directory);
+
+                return false;
+            }
+
+            dd_copy_fd (dump_directory, key, fd, 0, 0);
+
+            close (fd);
+        }
+    }
+
+    return true;
+}
+
 char *
 reportd_daemon_get_problem_directory (ReportdDaemon  *self,
                                       const char     *entry,
@@ -281,58 +350,12 @@ reportd_daemon_get_problem_directory (ReportdDaemon  *self,
     elements = g_variant_get_strv (elements_variant, &element_count);
     dump_directory = dd_create_skeleton (cache_problem_directory_path, -1, 0600, 0);
 
-    for (size_t i = 0; i < element_count; i += DBUS_FD_LIMIT)
+    if (!reportd_daemon_populate_dump_directory (self, entry, dump_directory,
+                                                 elements, element_count, error))
     {
-        GVariant *strv;
-        g_autoptr (GUnixFDList) out_fd_list = NULL;
-        g_autoptr (GVariant) return_value_tuple = NULL;
-        g_autoptr (GVariant) return_value = NULL;
-        GVariantIter iter;
-        char *key;
-        GVariant *value;
+        dd_close (dump_directory);
 
-        strv = g_variant_new_strv (elements + i, MIN (DBUS_FD_LIMIT, element_count - i));
-        out_fd_list = g_unix_fd_list_new ();
-        return_value_tuple =
-            g_dbus_connection_call_with_unix_fd_list_sync (self->system_bus_connection,
-                                                           "org.freedesktop.problems",
-                                                           entry,
-                                                           "org.freedesktop.Problems2.Entry",
-                                                           "ReadElements",
-                                                           g_variant_new_parsed ("(%as, 1)", strv),
-                                                           G_VARIANT_TYPE ("(a{sv})"),
-                                                           G_DBUS_CALL_FLAGS_NONE,
-                                                           -1,
-                                                           NULL, &out_fd_list,
-                                                           NULL,
-                                                           error);
-        if (NULL == return_value_tuple)
-        {
-            return NULL;
-        }
-        return_value = g_variant_get_child_value (return_value_tuple, 0);
-
-        g_variant_iter_init (&iter, return_value);
-
-        while (g_variant_iter_loop (&iter, "{sv}", &key, &value))
-        {
-            int index;
-            int fd;
-
-            index = g_variant_get_handle (value);
-            fd = g_unix_fd_list_get (out_fd_list, index, error);
-            if (-1 == fd)
-            {
-                close (fd);
-                dd_close (dump_directory);
-
-                return NULL;
-            }
-
-            dd_copy_fd (dump_directory, key, fd, 0, 0);
-
-            close(fd);
-        }
+        return NULL;
     }
 
     dd_close (dump_directory);
