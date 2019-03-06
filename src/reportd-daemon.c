@@ -179,7 +179,7 @@ reportd_daemon_on_name_lost (GDBusConnection *connection,
     daemon = REPORTD_DAEMON (user_data);
 
     error = g_error_new (G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
-                         "Bus name “%s” could not be acquired", name);
+                         "Bus name “%s” lost", name);
 
     reportd_daemon_quit (daemon, error);
 }
