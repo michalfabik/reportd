@@ -126,7 +126,7 @@ reportd_daemon_finalize (GObject *object)
 
     self = REPORTD_DAEMON (object);
 
-    g_bus_unown_name (self->bus_id);
+    g_clear_handle_id (&self->bus_id, g_bus_unown_name);
     g_clear_object (&self->cache_directory);
 }
 
