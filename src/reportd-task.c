@@ -315,7 +315,17 @@ reportd_task_handle_start (ReportdDbusTask       *object,
 
     run_event_chain (run_state, problem_directory, event_names);
 
-    reportd_daemon_push_problem_directory (self->daemon, problem_directory, NULL);
+    if (!reportd_daemon_push_problem_directory (self->daemon, problem_directory, &error))
+    {
+        reportd_dbus_task_set_status (self->task_iface, "FAILED");
+
+        g_dbus_method_invocation_return_gerror (invocation, error);
+
+        free_run_event_state (run_state);
+        g_list_free_full (event_names, g_free);
+
+        return true;
+    }
 
     reportd_dbus_task_set_status (self->task_iface, "FINISHED");
 

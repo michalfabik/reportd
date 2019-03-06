@@ -363,12 +363,44 @@ reportd_daemon_get_problem_directory (ReportdDaemon  *self,
     return g_steal_pointer (&cache_problem_directory_path);
 }
 
-bool
-reportd_daemon_push_problem_directory (ReportdDaemon  *self,
-                                       const char     *problem_directory,
-                                       GError        **error)
+static bool
+reportd_daemon_save_elements (ReportdDaemon  *self,
+                              const char     *entry,
+                              GVariant       *dictionary,
+                              GUnixFDList    *fd_list,
+                              GError        **error)
 {
-    g_autoptr (GFile) file = NULL;
+    g_autoptr (GVariantBuilder) builder = NULL;
+    g_autoptr (GVariant) variant = NULL;
+
+    builder = g_variant_builder_new (G_VARIANT_TYPE_TUPLE);
+
+    g_variant_builder_add_value (builder, dictionary);
+    g_variant_builder_add_parsed (builder, "0");
+
+    variant = g_dbus_connection_call_with_unix_fd_list_sync (self->system_bus_connection,
+                                                             "org.freedesktop.problems",
+                                                             entry,
+                                                             "org.freedesktop.Problems2.Entry",
+                                                             "SaveElements",
+                                                             g_variant_builder_end (builder),
+                                                             NULL,
+                                                             G_DBUS_CALL_FLAGS_NONE,
+                                                             -1,
+                                                             fd_list, NULL,
+                                                             NULL,
+                                                             error);
+
+    return variant != NULL;
+}
+
+static int
+reportd_daemon_get_n_elements (struct dump_dir  *dump_directory,
+                               int               n,
+                               GUnixFDList     **fd_list,
+                               GVariantDict    **dictionary,
+                               GError          **error)
+{
     const char *ignored_elements[] =
     {
         "analyzer",
@@ -377,11 +409,65 @@ reportd_daemon_push_problem_directory (ReportdDaemon  *self,
         "type",
         NULL,
     };
+    int count = 0;
+    char *tmp;
+
+    g_return_val_if_fail (NULL != fd_list, 0);
+    g_return_val_if_fail (NULL != dictionary, 0);
+
+    *fd_list = g_unix_fd_list_new ();
+    *dictionary = g_variant_dict_new (NULL);
+
+    for (int i = 0; i < n && dd_get_next_file (dump_directory, &tmp, NULL); i++)
+    {
+        g_autofree char *short_name = NULL;
+        int fd;
+        int pos;
+
+        short_name = g_steal_pointer (&tmp);
+
+        if (g_strv_contains (ignored_elements, short_name))
+        {
+            continue;
+        }
+
+        fd = openat (dump_directory->dd_fd, short_name, O_RDONLY);
+        if (-1 == fd)
+        {
+            g_warning ("Failed to open “%s”, ignoring", short_name);
+
+            continue;
+        }
+        pos = g_unix_fd_list_append (*fd_list, fd, error);
+        if (-1 == pos)
+        {
+            close (fd);
+
+            return -1;
+        }
+
+        g_variant_dict_insert (*dictionary, short_name, "h", pos);
+
+        count++;
+
+        close (fd);
+    }
+
+    return count;
+}
+
+bool
+reportd_daemon_push_problem_directory (ReportdDaemon  *self,
+                                       const char     *problem_directory,
+                                       GError        **error)
+{
+    g_autoptr (GFile) file = NULL;
     g_autofree char *base_name = NULL;
     g_autofree char *entry = NULL;
-    g_autoptr (GDBusProxy) entry_proxy = NULL;
     struct dump_dir *dump_directory;
-    char *temp = NULL;
+    g_autoptr (GVariantDict) dictionary = NULL;
+    g_autoptr (GUnixFDList) fd_list = NULL;
+    g_autoptr (GError) tmp_error = NULL;
 
     g_debug ("Pushing problem directory “%s”", problem_directory);
 
@@ -404,13 +490,6 @@ reportd_daemon_push_problem_directory (ReportdDaemon  *self,
 
     base_name = g_file_get_basename (file);
     entry = g_strdup_printf ("/org/freedesktop/Problems2/Entry/%s", base_name);
-    entry_proxy = g_dbus_proxy_new_sync (self->system_bus_connection,
-                                         G_DBUS_PROXY_FLAGS_NONE,
-                                         NULL,
-                                         "org.freedesktop.problems",
-                                         entry,
-                                         "org.freedesktop.Problems2.Entry",
-                                         NULL, error);
     dump_directory = dd_opendir (problem_directory, 0);
     if (NULL == dump_directory)
     {
@@ -422,71 +501,32 @@ reportd_daemon_push_problem_directory (ReportdDaemon  *self,
 
     dd_init_next_file (dump_directory);
 
-    while (dd_get_next_file (dump_directory, &temp, NULL))
+    while (reportd_daemon_get_n_elements (dump_directory, DBUS_FD_LIMIT,
+                                          &fd_list, &dictionary, &tmp_error) > 0)
     {
-        g_autofree char *short_name = NULL;
-        int fd;
-        g_autoptr (GUnixFDList) in_fd_list = NULL;
-        g_autoptr (GVariantDict) variant_dictionary = NULL;
-        int pos;
+        GVariant *variant;
 
-        short_name = g_steal_pointer (&temp);
+        variant = g_variant_dict_end (dictionary);
 
-        if (g_strv_contains (ignored_elements, short_name))
+        if (!reportd_daemon_save_elements (self, entry, variant, fd_list, error))
         {
-            continue;
-        }
-
-        fd = openat (dump_directory->dd_fd, short_name, O_RDONLY);
-        if (-1 == fd)
-        {
-            g_warning("Failed to open “%s”, ignoring", short_name);
-
-            continue;
-        }
-        in_fd_list = g_unix_fd_list_new ();
-        variant_dictionary = g_variant_dict_new (NULL);
-        pos = g_unix_fd_list_append (in_fd_list, fd, error);
-        if (-1 == pos)
-        {
-            close (fd);
             dd_close (dump_directory);
 
             return false;
         }
 
-        g_variant_dict_insert (variant_dictionary, short_name, "h", pos);
-
-        {
-            GVariant *children[] =
-            {
-                g_variant_dict_end (variant_dictionary),
-                g_variant_new_int32 (0),
-            };
-            GVariant *variant_tuple;
-            g_autoptr (GError) tmp_error = NULL;
-            g_autoptr (GVariant) return_value_variant = NULL;
-
-            variant_tuple = g_variant_new_tuple (children, G_N_ELEMENTS (children));
-
-            return_value_variant = g_dbus_proxy_call_with_unix_fd_list_sync (entry_proxy,
-                                                                             "SaveElements",
-                                                                             variant_tuple,
-                                                                             G_DBUS_CALL_FLAGS_NONE,
-                                                                             -1,
-                                                                             in_fd_list, NULL,
-                                                                             NULL, &tmp_error);
-            if (NULL == return_value_variant)
-            {
-                g_warning ("Failed to save element “%s”: %s",
-                           short_name, tmp_error->message);
-            }
-        }
-
-        close (fd);
+        g_clear_object (&fd_list);
+        g_clear_pointer (&dictionary, g_variant_dict_unref);
     }
 
     dd_close (dump_directory);
+
+    if (NULL != tmp_error)
+    {
+        g_propagate_error (error, tmp_error);
+
+        return false;
+    }
 
     return true;
 }
