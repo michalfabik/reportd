@@ -593,13 +593,11 @@ reportd_daemon_run (ReportdDaemon  *self,
 
     g_main_loop_run (self->main_loop);
 
-    if (NULL != error)
+    if (NULL != self->error)
     {
-        *error = g_steal_pointer (&self->error);
-        if (NULL != *error)
-        {
-            return EXIT_FAILURE;
-        }
+        g_propagate_error (error, self->error);
+
+        return EXIT_FAILURE;
     }
 
     return EXIT_SUCCESS;
