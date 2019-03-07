@@ -487,18 +487,6 @@ reportd_service_finalize (GObject *object)
 }
 
 static void
-reportd_service_constructed (GObject *object)
-{
-    ReportdService *self;
-
-    self = REPORTD_SERVICE (object);
-
-    reportd_daemon_register_object (self->daemon, G_DBUS_OBJECT_SKELETON (self));
-
-    G_OBJECT_CLASS (reportd_service_parent_class)->constructed (object);
-}
-
-static void
 reportd_service_class_init (ReportdServiceClass *klass)
 {
     GObjectClass *object_class;
@@ -509,7 +497,6 @@ reportd_service_class_init (ReportdServiceClass *klass)
     object_class->get_property = reportd_service_get_property;
     object_class->dispose = reportd_service_dispose;
     object_class->finalize = reportd_service_finalize;
-    object_class->constructed = reportd_service_constructed;
 
     properties[PROP_DAEMON] = g_param_spec_object ("daemon", "Daemon",
                                                    "The owning daemon instance",

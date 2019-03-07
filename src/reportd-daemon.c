@@ -153,80 +153,6 @@ reportd_daemon_class_init (ReportdDaemonClass *klass)
     g_object_class_install_properties (object_class, N_PROPERTIES, properties);
 }
 
-static void
-reportd_daemon_on_name_acquired (GDBusConnection *connection,
-                                 const char      *name,
-                                 gpointer         user_data)
-{
-    ReportdDaemon *self;
-
-    self = REPORTD_DAEMON (user_data);
-
-    self->object_manager = g_dbus_object_manager_server_new (REPORTD_DBUS_OBJECT_MANAGER_PATH);
-    self->service = reportd_service_new (self, REPORTD_DBUS_SERVICE_PATH);
-
-    g_dbus_object_manager_server_set_connection (self->object_manager, connection);
-}
-
-static void
-reportd_daemon_on_name_lost (GDBusConnection *connection,
-                             const char      *name,
-                             gpointer         user_data)
-{
-    ReportdDaemon *daemon;
-    g_autoptr (GError) error = NULL;
-
-    daemon = REPORTD_DAEMON (user_data);
-
-    error = g_error_new (G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
-                         "Bus name “%s” lost", name);
-
-    reportd_daemon_quit (daemon, error);
-}
-
-bool
-reportd_daemon_connect_to_bus (ReportdDaemon  *self,
-                               GCancellable   *cancellable,
-                               GError        **error)
-{
-    GDBusConnection *connection;
-
-    g_return_val_if_fail (REPORTD_IS_DAEMON (self), false);
-
-    if (g_cancellable_set_error_if_cancelled (cancellable, error))
-    {
-        return false;
-    }
-
-    self->system_bus_connection = g_bus_get_sync (G_BUS_TYPE_SYSTEM, cancellable, error);
-    if (NULL == self->system_bus_connection)
-    {
-        return false;
-    }
-    if (self->bus_type == G_BUS_TYPE_SESSION)
-    {
-        self->session_bus_connection = g_bus_get_sync (G_BUS_TYPE_SESSION, cancellable, error);
-        if (NULL == self->session_bus_connection)
-        {
-            return false;
-        }
-
-        connection = self->session_bus_connection;
-    }
-    else
-    {
-        connection = self->system_bus_connection;
-    }
-    self->bus_id = g_bus_own_name_on_connection (connection,
-                                                 REPORTD_DBUS_BUS_NAME,
-                                                 G_BUS_NAME_OWNER_FLAGS_DO_NOT_QUEUE,
-                                                 reportd_daemon_on_name_acquired,
-                                                 reportd_daemon_on_name_lost,
-                                                 self, NULL);
-
-    return true;
-}
-
 static bool
 reportd_daemon_populate_dump_directory (ReportdDaemon    *self,
                                         const char       *entry,
@@ -570,6 +496,76 @@ reportd_daemon_unregister_object (ReportdDaemon *self,
     g_dbus_object_manager_server_unexport (self->object_manager, object_path);
 }
 
+static void
+reportd_daemon_on_name_acquired (GDBusConnection *connection,
+                                 const char      *name,
+                                 gpointer         user_data)
+{
+    ReportdDaemon *self;
+
+    self = REPORTD_DAEMON (user_data);
+
+    self->object_manager = g_dbus_object_manager_server_new (REPORTD_DBUS_OBJECT_MANAGER_PATH);
+    self->service = reportd_service_new (self, REPORTD_DBUS_SERVICE_PATH);
+
+    reportd_daemon_register_object (self, G_DBUS_OBJECT_SKELETON (self->service));
+
+    g_dbus_object_manager_server_set_connection (self->object_manager, connection);
+}
+
+static void
+reportd_daemon_on_name_lost (GDBusConnection *connection,
+                             const char      *name,
+                             gpointer         user_data)
+{
+    ReportdDaemon *daemon;
+    g_autoptr (GError) error = NULL;
+
+    daemon = REPORTD_DAEMON (user_data);
+
+    error = g_error_new (G_DBUS_ERROR, G_DBUS_ERROR_FAILED,
+                         "Bus name “%s” lost", name);
+
+    reportd_daemon_quit (daemon, error);
+}
+
+static bool
+reportd_daemon_connect_to_bus (ReportdDaemon  *self,
+                               GError        **error)
+{
+    GDBusConnection *connection;
+
+    g_return_val_if_fail (REPORTD_IS_DAEMON (self), false);
+
+    self->system_bus_connection = g_bus_get_sync (G_BUS_TYPE_SYSTEM, NULL, error);
+    if (NULL == self->system_bus_connection)
+    {
+        return false;
+    }
+    if (self->bus_type == G_BUS_TYPE_SESSION)
+    {
+        self->session_bus_connection = g_bus_get_sync (G_BUS_TYPE_SESSION, NULL, error);
+        if (NULL == self->session_bus_connection)
+        {
+            return false;
+        }
+
+        connection = self->session_bus_connection;
+    }
+    else
+    {
+        connection = self->system_bus_connection;
+    }
+    self->bus_id = g_bus_own_name_on_connection (connection,
+                                                 REPORTD_DBUS_BUS_NAME,
+                                                 G_BUS_NAME_OWNER_FLAGS_DO_NOT_QUEUE,
+                                                 reportd_daemon_on_name_acquired,
+                                                 reportd_daemon_on_name_lost,
+                                                 self, NULL);
+
+    return true;
+}
+
 int
 reportd_daemon_run (ReportdDaemon  *self,
                     GError        **error)
@@ -578,6 +574,11 @@ reportd_daemon_run (ReportdDaemon  *self,
     g_autoptr (GFile) file = NULL;
 
     g_return_val_if_fail (REPORTD_IS_DAEMON (self), EXIT_FAILURE);
+
+    if (!reportd_daemon_connect_to_bus (self, error))
+    {
+        return EXIT_FAILURE;
+    }
 
     path = g_build_path ("/", g_get_user_runtime_dir (), "reportd", NULL);
 
@@ -616,6 +617,14 @@ reportd_daemon_quit (ReportdDaemon *self,
     {
         return;
     }
+
+    /* There’s a bit of a cycle going on here wrt references, so this is the
+     * most logical place to break it. We unexport the D-Bus object, which causes
+     * a reference on the service to be dropped, and then remove our internal
+     * reference, which also drops the daemon reference count.
+     */
+    reportd_daemon_unregister_object (self, G_DBUS_OBJECT (self->service));
+    g_clear_object (&self->service);
 
     g_main_loop_quit (self->main_loop);
 

@@ -22,10 +22,6 @@
 
 G_DECLARE_FINAL_TYPE (ReportdDaemon, reportd_daemon, REPORTD, DAEMON, GObject)
 
-bool           reportd_daemon_connect_to_bus         (ReportdDaemon        *daemon,
-                                                      GCancellable         *cancellable,
-                                                      GError              **error);
-
 char          *reportd_daemon_get_problem_directory  (ReportdDaemon        *daemon,
                                                       const char           *entry,
                                                       GError              **error);

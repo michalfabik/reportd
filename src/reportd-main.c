@@ -53,13 +53,6 @@ main (int    argc,
     sigint_source = g_unix_signal_add (SIGINT, on_signal_quit, daemon);
     sigterm_source = g_unix_signal_add (SIGTERM, on_signal_quit, daemon);
 
-    if (!reportd_daemon_connect_to_bus (daemon, NULL, &error))
-    {
-        g_warning ("Failed to connect to the message bus: %s", error->message);
-
-        return EXIT_FAILURE;
-    }
-
     load_user_settings ("reportd");
 
     status = reportd_daemon_run (daemon, &error);
