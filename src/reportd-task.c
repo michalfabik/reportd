@@ -69,6 +69,17 @@ do_log2 (char *log_line,
     return log_line;
 }
 
+static void
+reportd_task_error_callback (const char *error_line,
+                             void       *param)
+{
+    ReportdTask *self;
+
+    self = REPORTD_TASK (param);
+
+    reportd_dbus_task_emit_progress (self->task_iface, error_line);
+}
+
 static int
 export_config_and_run_event (struct run_event_state *state,
                              const char             *dump_dir_name,
@@ -304,6 +315,8 @@ reportd_task_handle_start (ReportdDbusTask       *object,
 
     run_state->logging_callback = do_log2;
     run_state->logging_param = self;
+    run_state->error_callback = reportd_task_error_callback;
+    run_state->error_param = self;
     run_state->interaction_param = self;
     run_state->ask_callback = reportd_task_ask_callback;
     run_state->ask_yes_no_callback = reportd_task_ask_yes_no_callback;
