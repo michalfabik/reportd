@@ -1,3 +1,10 @@
+0.6.2
+ * Correct memory management
+ * Send error messages as well via the Progress signal
+ * Batch some D-Bus method calls were appropriate to reduce the number of
+round-trips necessary
+ * Set C99 as default
+
 0.6.1
  * Work around GLib not caching property values in some cases
 
