@@ -116,7 +116,7 @@ reportd_daemon_dispose (GObject *object)
 
     self = REPORTD_DAEMON (object);
 
-    g_clear_pointer (&self->main_loop, g_main_loop_unref);
+    g_clear_object (&self->cache_directory);
 }
 
 static void
@@ -126,8 +126,8 @@ reportd_daemon_finalize (GObject *object)
 
     self = REPORTD_DAEMON (object);
 
+    g_clear_pointer (&self->main_loop, g_main_loop_unref);
     g_clear_handle_id (&self->bus_id, g_bus_unown_name);
-    g_clear_object (&self->cache_directory);
 }
 
 static void
