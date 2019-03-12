@@ -497,23 +497,6 @@ reportd_daemon_unregister_object (ReportdDaemon *self,
 }
 
 static void
-reportd_daemon_on_name_acquired (GDBusConnection *connection,
-                                 const char      *name,
-                                 gpointer         user_data)
-{
-    ReportdDaemon *self;
-
-    self = REPORTD_DAEMON (user_data);
-
-    self->object_manager = g_dbus_object_manager_server_new (REPORTD_DBUS_OBJECT_MANAGER_PATH);
-    self->service = reportd_service_new (self, REPORTD_DBUS_SERVICE_PATH);
-
-    reportd_daemon_register_object (self, G_DBUS_OBJECT_SKELETON (self->service));
-
-    g_dbus_object_manager_server_set_connection (self->object_manager, connection);
-}
-
-static void
 reportd_daemon_on_name_lost (GDBusConnection *connection,
                              const char      *name,
                              gpointer         user_data)
@@ -556,10 +539,17 @@ reportd_daemon_connect_to_bus (ReportdDaemon  *self,
     {
         connection = self->system_bus_connection;
     }
+    self->object_manager = g_dbus_object_manager_server_new (REPORTD_DBUS_OBJECT_MANAGER_PATH);
+    self->service = reportd_service_new (self, REPORTD_DBUS_SERVICE_PATH);
+
+    reportd_daemon_register_object (self, G_DBUS_OBJECT_SKELETON (self->service));
+
+    g_dbus_object_manager_server_set_connection (self->object_manager, connection);
+
     self->bus_id = g_bus_own_name_on_connection (connection,
                                                  REPORTD_DBUS_BUS_NAME,
                                                  G_BUS_NAME_OWNER_FLAGS_DO_NOT_QUEUE,
-                                                 reportd_daemon_on_name_acquired,
+                                                 NULL,
                                                  reportd_daemon_on_name_lost,
                                                  self, NULL);
 
