@@ -208,7 +208,6 @@ reportd_daemon_populate_dump_directory (ReportdDaemon    *self,
             if (-1 == fd)
             {
                 close (fd);
-                dd_close (dump_directory);
 
                 return false;
             }
