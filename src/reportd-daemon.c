@@ -273,6 +273,15 @@ reportd_daemon_get_problem_directory (ReportdDaemon  *self,
     variant = g_variant_get_child_value (tuple, 0);
     elements_variant = g_variant_get_variant (variant);
     elements = g_variant_get_strv (elements_variant, &element_count);
+
+    if (g_mkdir_with_parents (cache_directory_path, 0700) == -1)
+    {
+        g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno), "%s",
+                     strerror (errno));
+
+        return NULL;
+    }
+
     dump_directory = dd_create_skeleton (cache_problem_directory_path, -1, 0600, 0);
 
     if (!reportd_daemon_populate_dump_directory (self, entry, dump_directory,
@@ -572,14 +581,6 @@ reportd_daemon_run (ReportdDaemon  *self,
     path = g_build_path ("/", g_get_user_runtime_dir (), "reportd", NULL);
 
     self->cache_directory = g_file_new_for_path (path);
-
-    if (g_mkdir_with_parents (path, 0700) == -1)
-    {
-        g_set_error (error, G_FILE_ERROR, g_file_error_from_errno (errno), "%s",
-                     strerror (errno));
-
-        return EXIT_FAILURE;
-    }
 
     g_main_loop_run (self->main_loop);
 
