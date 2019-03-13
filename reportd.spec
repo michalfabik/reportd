@@ -13,7 +13,6 @@ BuildRequires:  gcc
 BuildRequires:  glib2-devel
 BuildRequires:  libreport-devel
 BuildRequires:  meson
-BuildRequires:  systemd
 
 %description
 A D-Bus service that exports libreport functionality.
@@ -45,21 +44,6 @@ A D-Bus service that exports libreport functionality.
 %{_datadir}/dbus-1/system.d/org.freedesktop.%{name}.conf
 %{_unitdir}/%{name}.service
 %{_userunitdir}/%{name}.service
-
-
-%post
-%systemd_post %{name}.service
-%systemd_user_post %{name}.service
-
-
-%preun
-%systemd_preun %{name}.service
-%systemd_user_preun %{name}.service
-
-
-%postun
-%systemd_postun_with_restart %{name}.service
-%systemd_user_postun_with_restart %{name}.service
 
 
 %changelog
