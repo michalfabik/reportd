@@ -1,6 +1,5 @@
 specfile_path: reportd.spec
 synced_files:
   - reportd.spec
-upstream_name: reportd
-package_name: reportd
-dist_git_url: https://src.fedoraproject.org/rpms/reportd.git
+upstream_project_name: reportd
+downstream_package_name: reportd
