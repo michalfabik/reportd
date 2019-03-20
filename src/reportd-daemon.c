@@ -117,6 +117,9 @@ reportd_daemon_dispose (GObject *object)
     self = REPORTD_DAEMON (object);
 
     g_clear_object (&self->cache_directory);
+    g_clear_object (&self->object_manager);
+    g_clear_object (&self->system_bus_connection);
+    g_clear_object (&self->session_bus_connection);
 }
 
 static void
