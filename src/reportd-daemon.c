@@ -568,7 +568,6 @@ int
 reportd_daemon_run (ReportdDaemon  *self,
                     GError        **error)
 {
-    g_autofree char *path = NULL;
     g_autoptr (GFile) file = NULL;
 
     g_return_val_if_fail (REPORTD_IS_DAEMON (self), EXIT_FAILURE);
@@ -578,9 +577,7 @@ reportd_daemon_run (ReportdDaemon  *self,
         return EXIT_FAILURE;
     }
 
-    path = g_build_path ("/", g_get_user_runtime_dir (), "reportd", NULL);
-
-    self->cache_directory = g_file_new_for_path (path);
+    self->cache_directory = g_file_new_for_path ("/tmp/reportd");
 
     g_main_loop_run (self->main_loop);
 
