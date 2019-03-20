@@ -1,3 +1,8 @@
+0.6.3
+ * Fix possible crash when creating cache directory fails
+ * Fix SELinux denials when passing FDs to ABRT
+ * Add some restrictions to the daemon in the service unit
+
 0.6.2
  * Correct memory management
  * Send error messages as well via the Progress signal
