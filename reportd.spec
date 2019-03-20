@@ -2,7 +2,7 @@
 
 Name:           reportd
 Version:        0.6.3
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Service reporting org.freedesktop.Problems2 entries
 
 License:        GPLv2+
@@ -13,6 +13,7 @@ BuildRequires:  gcc
 BuildRequires:  glib2-devel
 BuildRequires:  libreport-devel
 BuildRequires:  meson
+BuildRequires:  systemd
 
 %description
 A D-Bus service that exports libreport functionality.
@@ -47,6 +48,9 @@ A D-Bus service that exports libreport functionality.
 
 
 %changelog
+* Wed Mar 20 2019 Ernestas Kulik <ekulik@redhat.com> - 0.6.3-2
+- Add back systemd BuildRequires
+
 * Wed Mar 20 2019 Ernestas Kulik <ekulik@redhat.com> - 0.6.3-1
 - Update to 0.6.3
 
