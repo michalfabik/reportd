@@ -1,8 +1,8 @@
 %global _hardened_build 1
 
 Name:           reportd
-Version:        0.6.3
-Release:        2%{?dist}
+Version:        0.6.4
+Release:        1%{?dist}
 Summary:        Service reporting org.freedesktop.Problems2 entries
 
 License:        GPLv2+
@@ -48,6 +48,9 @@ A D-Bus service that exports libreport functionality.
 
 
 %changelog
+* Thu Mar 21 2019 Ernestas Kulik <ekulik@redhat.com> - 0.6.4-1
+- Update to 0.6.4
+
 * Wed Mar 20 2019 Ernestas Kulik <ekulik@redhat.com> - 0.6.3-2
 - Add back systemd BuildRequires
 

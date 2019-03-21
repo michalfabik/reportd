@@ -1,3 +1,6 @@
+0.6.4
+ * Fix broken reporting due to PrivateNetwork=true in the systemd service unit
+
 0.6.3
  * Fix possible crash when creating cache directory fails
  * Fix SELinux denials when passing FDs to ABRT
