@@ -6,7 +6,6 @@ Type=dbus
 BusName=org.freedesktop.reportd
 ExecStart=@libexecdir@/reportd @options@
 PrivateTmp=true
-PrivateNetwork=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 RestrictRealtime=true
