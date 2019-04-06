@@ -4,7 +4,7 @@ Description=ABRT Report Daemon
 [Service]
 Type=dbus
 BusName=org.freedesktop.reportd
-ExecStart=@libexecdir@/reportd @options@
+ExecStart=@libexecdir@/reportd --system
 PrivateTmp=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
