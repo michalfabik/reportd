@@ -1,3 +1,6 @@
+0.6.5
+ * Fix broken systemd user service unit
+
 0.6.4
  * Fix broken reporting due to PrivateNetwork=true in the systemd service unit
 
