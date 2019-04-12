@@ -300,6 +300,35 @@ reportd_daemon_get_problem_directory (ReportdDaemon  *self,
     return g_steal_pointer (&cache_problem_directory_path);
 }
 
+/* ABRT does not allow adding more data to existing elements, hence this.
+ * We also don’t care if the operation fails for whatever reason, since
+ * the idea is that we will recreate the missing elements right after.
+ * But if SaveElements does not do what we want, then, well…
+ */
+static void
+reportd_daemon_delete_volatile_elements (ReportdDaemon *self,
+                                         const char    *entry)
+{
+    const char *elements[] =
+    {
+        "reported_to",
+        NULL,
+    };
+
+    g_autoptr (GVariant) variant = NULL;
+
+    variant = g_dbus_connection_call_sync (self->system_bus_connection,
+                                           "org.freedesktop.problems",
+                                           entry,
+                                           "org.freedesktop.Problems2.Entry",
+                                           "DeleteElements",
+                                           g_variant_new ("(^as)", elements),
+                                           NULL,
+                                           G_DBUS_CALL_FLAGS_NONE,
+                                           -1,
+                                           NULL, NULL);
+}
+
 static bool
 reportd_daemon_save_elements (ReportdDaemon  *self,
                               const char     *entry,
@@ -435,6 +464,8 @@ reportd_daemon_push_problem_directory (ReportdDaemon  *self,
 
         return false;
     }
+
+    reportd_daemon_delete_volatile_elements (self, entry);
 
     dd_init_next_file (dump_directory);
 
