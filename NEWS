@@ -1,3 +1,7 @@
+0.6.7
+ * Set task status accordingly if workflow fails
+ * Ignore exit code 70 in report_uReport, which caused workflows to fail prematurely
+
 0.6.6
  * Fix failing problem directory synchronization after task completion
 
