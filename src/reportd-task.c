@@ -293,6 +293,7 @@ reportd_task_handle_start (ReportdDbusTask       *object,
     g_autofree char *problem_directory = NULL;
     struct run_event_state *run_state;
     GList *event_names;
+    bool finished;
 
     self = REPORTD_TASK (user_data);
     workflow_name = wf_get_name (self->workflow);
@@ -326,7 +327,7 @@ reportd_task_handle_start (ReportdDbusTask       *object,
 
     g_ptr_array_add (run_state->extra_environment, workflow_env);
 
-    run_event_chain (run_state, problem_directory, event_names);
+    finished = (run_event_chain (run_state, problem_directory, event_names) == 0);
 
     if (!reportd_daemon_push_problem_directory (self->daemon, problem_directory, &error))
     {
@@ -340,9 +341,9 @@ reportd_task_handle_start (ReportdDbusTask       *object,
         return true;
     }
 
-    reportd_dbus_task_set_status (self->task_iface, "FINISHED");
+    reportd_dbus_task_set_status (self->task_iface, finished? "FINISHED" : "FAILED");
 
-    g_debug ("Finished task “%s”", self->problem_path);
+    g_debug ("Task “%s” %s", self->problem_path, finished? "finished" : "failed");
 
     g_dbus_method_invocation_return_value (invocation, NULL);
 
