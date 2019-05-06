@@ -109,10 +109,34 @@ run_event_chain (struct run_event_state *run_state,
     for (GList *l = chain; NULL != l; l = l->next)
     {
         const char *event_name;
+        const struct
+        {
+            const char *event_name;
+            int quirk_code;
+            int quirk_mapping;
+        } quirks[] =
+        {
+            /* For some reason, abrt-action-ureport exits if it detects a
+             * Bugzilla report…
+             */
+            { "report_uReport", 70, 0 },
+        };
 
         event_name = l->data;
+        retval = export_config_and_run_event (run_state, dump_dir_name, event_name);
 
-        retval = export_config_and_run_event(run_state, dump_dir_name, event_name);
+        for (int i = 0; i < G_N_ELEMENTS (quirks); i++)
+        {
+            if (g_strcmp0 (quirks[i].event_name, event_name) == 0 &&
+                quirks[i].quirk_code == retval)
+            {
+                g_debug ("Event “%s” exited with code %d; replacing with %d",
+                         event_name, retval, quirks[i].quirk_mapping);
+
+                retval = quirks[i].quirk_mapping;
+            }
+        }
+
         if (retval != 0)
         {
             /* Nothing was run (bad backtrace, user declined, etc... */
