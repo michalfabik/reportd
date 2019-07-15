@@ -249,12 +249,12 @@ reportd_daemon_get_problem_directory (ReportdDaemon  *self,
 
     if (g_file_test (cache_problem_directory_path, G_FILE_TEST_EXISTS | G_FILE_TEST_IS_DIR))
     {
-        g_debug ("Cache directory for entry “%s” already exists, returning", entry);
+        g_message ("Cache directory for entry “%s” already exists, returning", entry);
 
         return g_steal_pointer (&cache_problem_directory_path);
     }
 
-    g_debug ("Pulling entry “%s”", entry);
+    g_message ("Pulling entry “%s”", entry);
 
     tuple = g_dbus_connection_call_sync (self->system_bus_connection,
                                          "org.freedesktop.problems",
@@ -435,7 +435,7 @@ reportd_daemon_push_problem_directory (ReportdDaemon  *self,
     g_autoptr (GUnixFDList) fd_list = NULL;
     g_autoptr (GError) tmp_error = NULL;
 
-    g_debug ("Pushing problem directory “%s”", problem_directory);
+    g_message ("Pushing problem directory “%s”", problem_directory);
 
     file = g_file_new_for_path (problem_directory);
 

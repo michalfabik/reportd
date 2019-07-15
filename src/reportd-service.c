@@ -146,7 +146,6 @@ reportd_service_handle_create_task (ReportdDbusService    *object,
     workflow_t *workflow;
     g_autoptr (ReportdTask) task = NULL;
     const char *object_path;
-    GVariant *variant;
     g_autoptr (GDBusConnection) connection = NULL;
     const char *sender;
     ReportdServiceBusNameWatcherData *data;
@@ -163,11 +162,10 @@ reportd_service_handle_create_task (ReportdDbusService    *object,
         return true;
     }
 
-    g_debug ("Creating task for problem “%s”", arg_problem);
+    g_message ("Creating task for problem “%s”", arg_problem);
 
     task = reportd_task_new (self->daemon, REPORTD_DBUS_TASK_PATH, arg_problem, workflow);
     object_path = g_dbus_object_get_object_path (G_DBUS_OBJECT (task));
-    variant = g_variant_new ("(o)", object_path);
     connection = g_dbus_method_invocation_get_connection (invocation);
     sender = g_dbus_method_invocation_get_sender (invocation);
     data = g_new0 (ReportdServiceBusNameWatcherData, 1);
@@ -190,7 +188,7 @@ reportd_service_handle_create_task (ReportdDbusService    *object,
 
     g_ptr_array_add (task_array, task);
 
-    g_dbus_method_invocation_return_value (invocation, variant);
+    reportd_dbus_service_complete_create_task (object, invocation, object_path);
 
     return true;
 }
@@ -218,12 +216,10 @@ reportd_service_handle_get_workflows (ReportdDbusService    *object,
         return true;
     }
 
-    g_debug ("Getting workflows for problem directory “%s”", problem_directory);
+    g_message ("Getting workflows for problem directory “%s”", problem_directory);
 
     workflows = list_possible_events_glist (problem_directory, "workflow");
-    builder = g_variant_builder_new (G_VARIANT_TYPE ("(a(sss))"));
-
-    g_variant_builder_open (builder, G_VARIANT_TYPE ("a(sss)"));
+    builder = g_variant_builder_new (G_VARIANT_TYPE ("a(sss)"));
 
     for (GList *l = workflows; NULL != l; l = l->next)
     {
@@ -234,7 +230,7 @@ reportd_service_handle_get_workflows (ReportdDbusService    *object,
         workflow = g_hash_table_lookup (self->workflows, workflow_name);
         if (NULL == workflow)
         {
-            g_debug ("Possible workflow without configuration: %s", workflow_name);
+            g_message ("Possible workflow without configuration: %s", workflow_name);
 
             continue;
         }
@@ -246,10 +242,8 @@ reportd_service_handle_get_workflows (ReportdDbusService    *object,
                                wf_get_description (workflow));
     }
 
-    g_variant_builder_close (builder);
-
-    g_dbus_method_invocation_return_value (invocation,
-                                           g_variant_builder_end (builder));
+    reportd_dbus_service_complete_get_workflows (object, invocation,
+                                                 g_variant_builder_end (builder));
 
     return true;
 }
@@ -349,7 +343,8 @@ reportd_service_handle_authorize_problems_session (ReportdDbusService    *object
 
         case 0:
         {
-            g_dbus_method_invocation_return_value (invocation, NULL);
+            reportd_dbus_service_complete_authorize_problems_session (object,
+                                                                      invocation);
         }
         break;
 

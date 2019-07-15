@@ -12,9 +12,6 @@
     -->
     <interface name="org.freedesktop.reportd.Service">
 
-        <!--
-          CreateTask:
-        -->
         <method name="CreateTask">
             <arg name="workflow" type="s" direction="in"/>
             <arg name="problem" type="o" direction="in"/>
@@ -39,22 +36,12 @@
 
     </interface>
 
-    <!--
-      org.freedesktop.reportd.Task:
-      @short_description: a task
-    -->
     <interface name="org.freedesktop.reportd.Task">
 
         <method name="Start">
-            <!-- no arguments -->
         </method>
 
-        <!--
-          Cancel:
-          @operation: the operation to cancel
-        -->
         <method name="Cancel">
-            <!-- no arguments -->
         </method>
 
         <signal name="Progress">
@@ -67,7 +54,7 @@
           <arg name="type" type="u"/>
         </signal>
 
-        <property name="Status" type="s" access="read"/>
+        <property name="Status" type="i" access="read"/>
 
     </interface>
 

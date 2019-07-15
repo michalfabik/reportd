@@ -22,9 +22,18 @@
 
 G_BEGIN_DECLS
 
+#define REPORTD_TASK_ERROR reportd_task_error_quark ()
 #define REPORTD_TYPE_TASK reportd_task_get_type ()
 
 G_DECLARE_FINAL_TYPE (ReportdTask, reportd_task, REPORTD, TASK, GDBusObjectSkeleton)
+
+typedef enum
+{
+    REPORTD_TASK_ERROR_EVENT_HANDLER_FAILED,
+    REPORTD_TASK_ERROR_NO_EVENT_HANDLERS,
+} ReportdTaskError;
+
+GQuark reportd_task_error_quark (void);
 
 ReportdTask *reportd_task_new (ReportdDaemon   *daemon,
                                const char      *object_path,
