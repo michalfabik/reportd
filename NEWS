@@ -1,3 +1,7 @@
+0.7.0
+ * Implement task cancellation
+ * Change type of the Status property for org.freedesktop.reportd.Task to integer
+
 0.6.7
  * Set task status accordingly if workflow fails
  * Ignore exit code 70 in report_uReport, which caused workflows to fail prematurely

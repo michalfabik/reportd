@@ -1,7 +1,7 @@
 %global _hardened_build 1
 
 Name:           reportd
-Version:        0.6.7
+Version:        0.7.0
 Release:        1%{?dist}
 Summary:        Service reporting org.freedesktop.Problems2 entries
 
@@ -48,6 +48,9 @@ A D-Bus service that exports libreport functionality.
 
 
 %changelog
+* Tue Jul 16 2019 Ernestas Kulik <ekulik@redhat.com> - 0.7.0-1
+- Update to 0.7.0
+
 * Mon May 6 2019 Ernestas Kulik <ekulik@redhat.com> - 0.6.7-1
 - Update to 0.6.7
 
