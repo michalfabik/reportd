@@ -1,5 +1,6 @@
 specfile_path: reportd.spec
 synced_files:
+  - .packit.yml
   - reportd.spec
 upstream_project_name: reportd
 downstream_package_name: reportd
