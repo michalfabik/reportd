@@ -424,6 +424,8 @@ reportd_task_on_finished (GObject      *source_object,
         return;
     }
 
+    reportd_dbus_task_set_status (proxy, REPORTD_TASK_STATE_COMPLETED);
+
     reportd_dbus_task_complete_start (proxy, invocation);
 }
 
