@@ -402,7 +402,7 @@ reportd_task_on_finished (GObject      *source_object,
     invocation = G_DBUS_METHOD_INVOCATION (user_data);
     proxy = REPORTD_DBUS_TASK (source_object);
 
-    g_task_propagate_pointer (task, &error);
+    (void) g_task_propagate_boolean (task, &error);
 
     if (g_task_had_error (task))
     {
@@ -498,6 +498,8 @@ reportd_task_start (GTask        *task,
 
         goto cleanup;
     }
+
+    g_task_return_boolean (task, true);
 
 cleanup:
     g_clear_pointer (&self->run_state, free_run_event_state);
