@@ -1,70 +1,58 @@
 <!DOCTYPE node PUBLIC "-//freedesktop//DTD D-BUS Object Introspection 1.0//EN"
  "http://www.freedesktop.org/standards/dbus/1.0/introspect.dtd">
 <node name="/">
+  <!--
+    org.freedesktop.reportd.Service:
+    @short_description: the reportd service
 
+    The object is a singleton and sits on bus name
+    <literal>org.freedesktop.reportd</literal> with the object path
+    <literal>/org/freedesktop/reportd/Service</literal>
+  -->
+  <interface name="org.freedesktop.reportd.Service">
+    <method name="CreateTask">
+      <arg name="workflow" type="s" direction="in"/>
+      <arg name="problem" type="o" direction="in"/>
+      <arg name="task" type="o" direction="out"/>
+    </method>
+    <method name="GetWorkflows">
+      <arg name="problem" type="o" direction="in"/>
+      <arg name="workflows" type="a(sss)" direction="out"/>
+    </method>
     <!--
-      org.freedesktop.reportd.Service:
-      @short_description: the reportd service
-
-      The object is a singleton and sits on bus name
-      <literal>org.freedesktop.reportd</literal> with the object path
-      <literal>/org/freedesktop/reportd/Service</literal>
+      Try to authorize problems session. The client can use Authorized
+      Session and see problems of all users and the service would not be
+      allowed to access the passed problem entries without authorization.
+      In this case authorization of own problem session should be automatic.
     -->
-    <interface name="org.freedesktop.reportd.Service">
+    <method name="AuthorizeProblemsSession">
+      <!-- For future needs -->
+      <arg name="flags" type="i" direction="in"/>
+    </method>
+  </interface>
+  <interface name="org.freedesktop.reportd.Task">
+    <method name="Start">
+    </method>
+    <method name="Cancel">
+    </method>
 
-        <method name="CreateTask">
-            <arg name="workflow" type="s" direction="in"/>
-            <arg name="problem" type="o" direction="in"/>
-            <arg name="task" type="o" direction="out"/>
-        </method>
+    <signal name="Progress">
+      <arg name="line" type="s" direction="out"/>
+    </signal>
+    <signal name="Prompt">
+      <arg name="path" type="s"/>
+      <arg name="message" type="s"/>
+      <arg name="type" type="u"/>
+    </signal>
 
-        <method name="GetWorkflows">
-            <arg name="problem" type="o" direction="in"/>
-            <arg name="workflows" type="a(sss)" direction="out"/>
-        </method>
+    <property name="Status" type="i" access="read"/>
+  </interface>
+  <interface name="org.freedesktop.reportd.Task.Prompt">
+    <method name="Commit">
+    </method>
 
-        <!--
-          Try to authorize problems session. The client can use Authorized
-          Session and see problems of all users and the service would not be
-          allowed to access the passed problem entries without authorization.
-          In this case authorization of own problem session should be automatic.
-        -->
-        <method name="AuthorizeProblemsSession">
-            <!-- For future needs -->
-            <arg name="flags" type="i" direction="in"/>
-        </method>
-
-    </interface>
-
-    <interface name="org.freedesktop.reportd.Task">
-
-        <method name="Start">
-        </method>
-
-        <method name="Cancel">
-        </method>
-
-        <signal name="Progress">
-            <arg name="line" type="s" direction="out"/>
-        </signal>
-
-        <signal name="Prompt">
-          <arg name="path" type="s"/>
-          <arg name="message" type="s"/>
-          <arg name="type" type="u"/>
-        </signal>
-
-        <property name="Status" type="i" access="read"/>
-
-    </interface>
-
-    <interface name="org.freedesktop.reportd.Task.Prompt">
-      <property name="Input" type="s" access="write"/>
-      <property name="Remember" type="b" access="write"/>
-      <property name="Response" type="b" access="write"/>
-
-      <method name="Commit">
-      </method>
-    </interface>
-
-<node name="/">
+    <property name="Input" type="s" access="write"/>
+    <property name="Remember" type="b" access="write"/>
+    <property name="Response" type="b" access="write"/>
+  </interface>
+</node>
