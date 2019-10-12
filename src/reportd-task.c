@@ -394,11 +394,15 @@ reportd_task_on_finished (GObject      *source_object,
                           gpointer      user_data)
 {
     GTask *task;
+    gpointer task_data;
+    ReportdTask *self;
     GError *error = NULL;
     GDBusMethodInvocation *invocation;
     ReportdDbusTask *proxy;
 
     task = G_TASK (res);
+    task_data = g_task_get_task_data (task);
+    self = REPORTD_TASK (task_data);
     invocation = G_DBUS_METHOD_INVOCATION (user_data);
     proxy = REPORTD_DBUS_TASK (source_object);
 
@@ -409,6 +413,9 @@ reportd_task_on_finished (GObject      *source_object,
         GCancellable *cancellable;
 
         cancellable = g_task_get_cancellable (task);
+
+        g_message ("Task %s finished with an error: %s",
+                   self->problem_path, error->message);
 
         if (g_cancellable_is_cancelled (cancellable))
         {
@@ -423,6 +430,8 @@ reportd_task_on_finished (GObject      *source_object,
 
         return;
     }
+
+    g_message ("Task %s finished successfully", self->problem_path);
 
     reportd_dbus_task_set_status (proxy, REPORTD_TASK_STATE_COMPLETED);
 
