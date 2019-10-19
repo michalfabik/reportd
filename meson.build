@@ -50,3 +50,22 @@ gnome = import('gnome')
 subdir('dbus')
 subdir('src')
 subdir('systemd')
+
+tito = find_program('tito',
+  required: false,
+  disabler: true,
+)
+
+# This will, naturally, fail if the build directory is outside the git repo,
+# since Tito does not provide a way to specify the working directory or the spec
+# file using the CLI.
+run_target('rpm',
+  command: [
+    tito,
+    'build',
+    '--offline',
+    '--output=@0@/rpm'.format(meson.current_build_dir()),
+    '--rpm',
+    '--test'
+  ],
+)
