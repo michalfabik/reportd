@@ -107,7 +107,7 @@ export_config_and_run_event (struct run_event_state *state,
 
     env_list = export_event_config (event);
 
-    prepare_commands (state, dump_dir_name, event);
+    prepare_commands (state);
 
     while (spawn_next_command (state, dump_dir_name, event, EXECFLG_SETPGID) >= 0)
     {
