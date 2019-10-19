@@ -1,6 +1,6 @@
 project('reportd', 'c',
   license: 'GPL2+',
-  version: '0.7.1',
+  version: '0.7.2',
   default_options: [
     'c_std=c99',
   ],
