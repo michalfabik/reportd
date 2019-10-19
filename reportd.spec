@@ -10,8 +10,8 @@ URL:            https://github.com/abrt/%{name}
 Source0:        https://github.com/abrt/%{name}/archive/%{version}/%{name}-%{version}.tar.gz
 
 BuildRequires:  gcc
-BuildRequires:  glib2-devel
-BuildRequires:  libreport-devel
+BuildRequires:  pkgconfig(glib-2.0)
+BuildRequires:  pkgconfig(libreport)
 BuildRequires:  meson
 BuildRequires:  systemd
 
