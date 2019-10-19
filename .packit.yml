@@ -2,6 +2,6 @@ specfile_path: reportd.spec
 synced_files:
   - .packit.yml
   - reportd.spec
-upstream_project_name: reportd
+upstream_package_name: reportd
 upstream_project_url: https://github.com/packit-service/packit
 downstream_package_name: reportd
