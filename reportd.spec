@@ -2,7 +2,7 @@
 
 Name:           reportd
 Version:        0.7.2
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Service reporting org.freedesktop.Problems2 entries
 
 License:        GPLv2+
