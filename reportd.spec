@@ -15,6 +15,14 @@ BuildRequires:  libreport-devel
 BuildRequires:  meson
 BuildRequires:  systemd
 
+%if 0%{?centos}
+Recommends:     libreport-centos
+%endif
+
+%if 0%{?fedora}
+Recommends:     libreport-fedora
+%endif
+
 %description
 A D-Bus service that exports libreport functionality.
 
