@@ -177,18 +177,13 @@ reportd_task_run_event_chain (ReportdTask             *self,
         {
             /* Nothing was run (bad backtrace, user declined, etc... */
             g_set_error (error, REPORTD_TASK_ERROR, REPORTD_TASK_ERROR_EVENT_HANDLER_FAILED,
-                         "Event %s handler exited with code %d", event_name, exit_code);
+                         "Event “%s” handler exited with code %d", event_name, exit_code);
 
             return false;
         }
         else if (0 == self->run_state->children_count)
         {
             g_warning ("No processing specified for event “%s”", event_name);
-
-            g_set_error (error, REPORTD_TASK_ERROR, REPORTD_TASK_ERROR_NO_EVENT_HANDLERS,
-                         "Event %s has no handlers defined", event_name);
-
-            return false;
         }
     }
 
