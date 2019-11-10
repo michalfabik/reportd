@@ -1,3 +1,6 @@
+0.7.3
+ * Fix breakage after wildcard expansion in event definitions landing in libreport
+
 0.7.2
  * Add more logging
  * Adapt to API breakage in libreport
