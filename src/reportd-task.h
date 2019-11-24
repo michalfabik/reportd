@@ -30,7 +30,6 @@ G_DECLARE_FINAL_TYPE (ReportdTask, reportd_task, REPORTD, TASK, GDBusObjectSkele
 typedef enum
 {
     REPORTD_TASK_ERROR_EVENT_HANDLER_FAILED,
-    REPORTD_TASK_ERROR_NO_EVENT_HANDLERS,
 } ReportdTaskError;
 
 GQuark reportd_task_error_quark (void);
