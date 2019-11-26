@@ -69,3 +69,13 @@ run_target('rpm',
     '--test'
   ],
 )
+run_target('srpm',
+  command: [
+    tito,
+    'build',
+    '--offline',
+    '--output=@0@/rpm'.format(meson.current_build_dir()),
+    '--srpm',
+    '--test'
+  ],
+)
