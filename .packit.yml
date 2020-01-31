@@ -3,5 +3,5 @@ synced_files:
   - .packit.yml
   - reportd.spec
 upstream_package_name: reportd
-upstream_project_url: https://github.com/packit-service/packit
+upstream_project_url: https://github.com/abrt/reportd
 downstream_package_name: reportd
