@@ -378,7 +378,7 @@ static void
 reportd_service_init (ReportdService *self)
 {
     self->service_iface = reportd_dbus_service_skeleton_new ();
-    self->workflows = load_workflow_config_data (NULL);
+    self->workflows = libreport_load_workflow_config_data (NULL);
     self->tasks = g_hash_table_new_full (g_str_hash, g_str_equal,
                                          g_free, (GDestroyNotify) g_ptr_array_unref);
 

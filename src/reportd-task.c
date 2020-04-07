@@ -304,13 +304,13 @@ reportd_task_ask_yes_no_yesforever_callback (const char *key,
     bool response;
     bool remember;
 
-    value = get_user_setting (key);
+    value = libreport_get_user_setting (key);
     /* The following is replicating the madness inside libreport, where
      * “no” means “yes, forever”, and “yes” means nothing, really.
      *
      * Yes (no?), each implementation has a similar comment.
      */
-    if (value != NULL && !string_to_bool(value))
+    if (value != NULL && !libreport_string_to_bool(value))
     {
         return TRUE;
     }
@@ -324,7 +324,7 @@ reportd_task_ask_yes_no_yesforever_callback (const char *key,
     remember = reportd_dbus_task_prompt_get_remember (prompt_interface);
     if (remember && !response)
     {
-        set_user_setting (key, "no");
+        libreport_set_user_setting (key, "no");
     }
 
     return response;
@@ -341,10 +341,10 @@ reportd_task_ask_yes_no_save_result_callback (const char *key,
     bool response;
     bool remember;
 
-    value = get_user_setting (key);
+    value = libreport_get_user_setting (key);
     if (value != NULL)
     {
-        return string_to_bool (value);
+        return libreport_string_to_bool (value);
     }
     self = REPORTD_TASK (interaction_param);
     prompt_interface = reportd_task_emit_prompt (self, msg, ASK_YES_NO_SAVE);
@@ -358,7 +358,7 @@ reportd_task_ask_yes_no_save_result_callback (const char *key,
     {
         value = response? "yes" : "no";
 
-        set_user_setting (key, value);
+        libreport_set_user_setting (key, value);
     }
 
     return response;
