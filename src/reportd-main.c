@@ -53,7 +53,7 @@ main (int    argc,
     sigint_source = g_unix_signal_add (SIGINT, on_signal_quit, daemon);
     sigterm_source = g_unix_signal_add (SIGTERM, on_signal_quit, daemon);
 
-    load_user_settings ("reportd");
+    libreport_load_user_settings ("reportd");
 
     status = reportd_daemon_run (daemon, &error);
     if (status != EXIT_SUCCESS)
@@ -61,7 +61,7 @@ main (int    argc,
         g_warning ("Daemon stopped with an error: %s", error->message);
     }
 
-    save_user_settings ();
+    libreport_save_user_settings ();
 
     g_clear_handle_id (&sigint_source, g_source_remove);
     g_clear_handle_id (&sigterm_source, g_source_remove);
