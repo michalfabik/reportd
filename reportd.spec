@@ -1,7 +1,7 @@
 %global _hardened_build 1
 
 Name:           reportd
-Version:        0.7.3
+Version:        0.7.4
 Release:        1%{?dist}
 Summary:        Service reporting org.freedesktop.Problems2 entries
 

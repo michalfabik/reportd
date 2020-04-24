@@ -1,9 +1,9 @@
-project('reportd', 'c',
-  license: 'GPL2+',
-  version: '0.7.3',
-  default_options: [
-    'c_std=c99',
-  ],
+project(
+  'reportd',
+  'c',
+  license : 'GPL2+',
+  version : '0.7.4',
+  default_options : ['c_std=c99']
 )
 
 cc = meson.get_compiler('c')
