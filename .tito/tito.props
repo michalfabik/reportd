@@ -2,5 +2,4 @@
 builder = tito.builder.Builder
 tagger = abrt.tagger.MesonVersionTagger
 lib_dir = .tito/custom
-tag_commit_message_format = Release version %(version)s
 tag_format = {version}
