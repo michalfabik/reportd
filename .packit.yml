@@ -5,7 +5,6 @@ synced_files:
 upstream_package_name: reportd
 upstream_project_url: https://github.com/abrt/reportd
 downstream_package_name: reportd
-upstream_tag_template: v{version}
 jobs:
 - job: propose_downstream
   trigger: release
