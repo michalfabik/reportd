@@ -42,7 +42,7 @@ prefix = get_option('prefix')
 
 gio = dependency('gio-2.0')
 gio_unix = dependency('gio-unix-2.0')
-libreport = dependency('libreport', version: '>= 2.10.0')
+libreport = dependency('libreport', version: '>= 2.13.0')
 systemd = dependency('systemd')
 
 gnome = import('gnome')

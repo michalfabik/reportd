@@ -11,7 +11,7 @@ Source0:        https://github.com/abrt/%{name}/archive/%{version}/%{name}-%{ver
 
 BuildRequires:  gcc
 BuildRequires:  pkgconfig(glib-2.0)
-BuildRequires:  pkgconfig(libreport) >= 2.11.0
+BuildRequires:  pkgconfig(libreport) >= 2.13.0
 BuildRequires:  meson
 BuildRequires:  systemd
 
